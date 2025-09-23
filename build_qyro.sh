@@ -1,44 +1,45 @@
 #!/bin/bash
 
 VERSION="1.0.0"
+PACKAGE_NAME="qyro"
 
-# Verificar que Poetry esté instalado
+# Check if Poetry is installed
 if ! command -v poetry &> /dev/null; then
-    echo "❌ Poetry no está instalado. Instálalo con: pip install poetry"
+    echo "❌ Poetry is not installed. Install it with: pip install poetry"
     exit 1
 fi
 
-echo "🔄 Actualizando datos del paquete..."
+echo "🔄 Updating package data..."
 if [ -f "package.json" ]; then
-    cp package.json qyro/cli_commands/
-    echo "✅ package.json copiado"
+    cp package.json $PACKAGE_NAME/cli_commands/
+    echo "✅ package.json copied"
 else
-    echo "⚠️  package.json no encontrado, continuando..."
+    echo "⚠️  package.json not found, continuing..."
 fi
 
-echo "🧹 Limpiando builds anteriores..."
+echo "🧹 Cleaning previous builds..."
 rm -rf build dist *.egg-info
 
-echo "📦 Verificando configuración de Poetry..."
+echo "📦 Checking Poetry configuration..."
 poetry check
 
-echo "📦 Creando wheel para qyro v$VERSION con Poetry..."
+echo "📦 Building wheel for $PACKAGE_NAME v$VERSION with Poetry..."
 poetry build
 
 if [ $? -eq 0 ]; then
-    echo "✅ Build exitoso"
-    
-    echo "📥 Desinstalando versión anterior..."
-    pip uninstall -y qyro-engine
-    
-    echo "📥 Instalando wheel local..."
-    if pip install "dist/qyro_engine-$VERSION-py3-none-any.whl"; then
-        echo "✅ Instalación completada para qyro-engine v$VERSION"
+    echo "✅ Build successful"
+
+    echo "📥 Uninstalling previous version..."
+    pip uninstall -y $PACKAGE_NAME
+
+    echo "📥 Installing local wheel..."
+    if pip install "dist/${PACKAGE_NAME//-/_}-$VERSION-py3-none-any.whl"; then
+        echo "✅ Installation completed for $PACKAGE_NAME v$VERSION"
     else
-        echo "❌ Error en la instalación"
+        echo "❌ Installation failed"
         exit 1
     fi
 else
-    echo "❌ Error en el build"
+    echo "❌ Build failed"
     exit 1
 fi

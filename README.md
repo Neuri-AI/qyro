@@ -2,8 +2,6 @@
   <img src="https://ik.imagekit.io/kummiktgaiq/ppg/Qyro-logo.svg?updatedAt=1755215983279" alt="Qyro Logo" width="50%">
 </p>
 
-
-
 <h3 align="center">Qyro - <b>Q</b>t p<b>y</b>thon <b>R</b>esource <b>O</b>rchestrator</h3>
 
 ![GitHub Release](https://img.shields.io/github/v/release/runesc/qyro-engine?include_prereleases&display_name=release&color=stable)
@@ -13,88 +11,97 @@
 ![GitHub stars](https://img.shields.io/github/stars/runesc/qyro-engine)
 ![GitHub license](https://img.shields.io/github/license/runesc/qyro-engine)
 
+Qyro effortlessly package, compile, and deploy Python applications for desktop and mobile like Windows, macOS, Linux, Android, and iOS. It supports Kivy, Tkinter, PyQt5, PySide2, PyQt6, and PySide6, with a seamless workflow for resource management and installer creation.
 
-Qyro is a simple and powerful **Python application packager**, inspired by FBS.  
-It allows you to compile Python/Qt applications into standalone executables with ease, manage resources, and create installers for multiple platforms.
+## Features
 
----
+- **Cross-platform support**: Build executables and installers for desktop (Win, macOS, Linux) and mobile (Android, iOS).
+- **Multi-framework support**: Kivy, Tkinter, Qt5/Qt6 (PyQt & PySide).
+- **Easy resource management**: icons, assets, configs, etc.
+- **Simple CLI**: Initialize, develop, build, and package in seconds.
 
-### 🔥 Key Features
 
-- **Cross-Platform Packaging**: Build standalone executables for Windows, macOS, and Linux.
-- **Installer Creation**: Automatically generate platform-specific installers.
-- **Resource Management**: Include assets, icons, and other files seamlessly.
-- **CLI Driven**: Full project management via a simple command-line interface.
 
----
-
-### 🚀 Quick Start
+## Quick Start
 
 ```bash
-# 1. Install Qyro via pip
+# Install
 pip install qyro
 
-# 2. Initialize a new project
+# Start a new project
 qyro init
 
-# 3. Run your app in development mode (optional)
+# Run in development mode
 qyro start
 
-# 4. Compile your app into a standalone executable
+# Build standalone executable
 qyro freeze
 
-# 5. Create an installer
+# Create installer
 qyro installer
 ```
 
----
+## Commands
 
-### CLI Usage
+| Command        | Description                                          |
+|----------------|------------------------------------------------------|
+| `qyro init`    | Setup a new project interactively                    |
+| `qyro start`   | Run your app for development/testing                 |
+| `qyro freeze`  | Build the standalone executable                      |
+| `qyro installer` | Generate platform-specific installer               |
+| `qyro clean`   | Remove temporary/build files                         |
 
-| Command          | Description                                                       |
-| ---------------- | ----------------------------------------------------------------- |
-| `qyro init`      | Initialize a new Qyro project with interactive setup.             |
-| `qyro start`     | Run your application in development mode (optional, for testing). |
-| `qyro freeze`    | Compile your Python/Qt app into a standalone executable.          |
-| `qyro installer` | Create a platform-specific installer for your app.                |
-| `qyro clean`     | Remove temporary files and build artifacts.                       |
+## Installation
 
----
+- **Recommended:**  
 
-### Installation
+  `pip install qyro`
+  
+- **Latest Development:**  
 
-1. **Using pip** (recommended):
+  `pip install git+https://github.com/neuri-ai/Qyro.git`
 
-```bash
-pip install qyro
-```
+- **Local Install:**  
+  ```
+  git clone https://github.com/neuri-ai/Qyro.git
+  cd Qyro
+  pip install .
+  ```
 
-2. **From GitHub (latest development version)**:
 
-```bash
-pip install git+https://github.com/neuri-ai/Qyro.git
-```
+# License
 
-3. **Or clone and install locally**:
+QYRO is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
 
-```bash
-git clone https://github.com/neuri-ai/Qyro.git
-cd Qyro
-python setup.py install
-```
 
----
+# Creators
 
-### Creators
+- [Runesc](https://github.com/runesc)
+- [Neuri AI](https://neuri.ai)
 
-**Luis Alfredo Reyes**
 
-- [https://twitter.com/Fredo_Dev](https://twitter.com/Fredo_Dev)
-- [https://github.com/runesc](https://github.com/runesc)
 
----
+## FAQ
 
-### License
+**Which platforms does QYRO support?**  
+QYRO builds and packages applications for Windows, macOS, Linux, Android, and iOS.
 
-Qyro code released under the [MIT License](https://github.com/runesc/qyro-engine/blob/main/LICENSE).
-Docs released under [Creative Commons](https://creativecommons.org/licenses/by/3.0/).
+**What GUI frameworks are compatible?**  
+Kivy, Tkinter, PyQt5, PySide2, PyQt6, and PySide6 are all supported.
+
+**Can I use QYRO for mobile apps?**  
+Yes, you can package your Python projects for Android and iOS.
+
+**Do I need to manually include assets and resources?**  
+No, QYRO handles packaging of icons, assets, configs, and resources automatically, just drop them in the designated folders.
+
+**Is there a graphical interface?**  
+Currently, QYRO offers a simple command-line interface (CLI).
+
+**What’s the license for QYRO?**  
+QYRO is released under the MIT license.
+
+**Where can I get help or report bugs?**  
+You can [open an issue](https://github.com/runesc/qyro-engine/issues) or check the docs for support.
+
+
