@@ -25,7 +25,7 @@ from qyro.utils.parsers import to_camel_case
 from qyro.utils.project_reader import get_project_settings, _find_and_store_settings, _validate_project_structure
 from qyro.utils.helpers import valid_version
 from qyro.pipelines import get_freezer
-from qyro.cli_commands.templates.component import COMPONENT_TEMPLATE
+from qyro.cli_commands.templates.component import QT_COMPONENT_TEMPLATE
 
 console = Console()
 
@@ -123,7 +123,7 @@ def init(name: str = "."):
     table.add_row("Version:", f"[cyan]{version}[/cyan]")
     table.add_row("Author:", f"[cyan]{author}[/cyan]")
     table.add_row("Qt binding:", f"[cyan]{python_binding}[/cyan]")
-    table.add_row("Mac bundle identifier:",f"[cyan]{mac_bundle_identifier or '(none)'}[/cyan]")
+    table.add_row("Mac bundle identifier:", f"[cyan]{mac_bundle_identifier or '(none)'}[/cyan]")
 
     console.print(Panel(
         table, title="[bold]Please confirm your settings[/bold]", border_style="blue"))
@@ -210,7 +210,7 @@ def create(type: str = None, name: str = None, inherit: str = None):
     if not inherit:
         inherit = text("Inherit from: ", default="QtWidget").ask()
 
-    template = Template(COMPONENT_TEMPLATE)
+    template = Template(QT_COMPONENT_TEMPLATE)
     code = template.substitute(Binding=binding, Name=name, Widget=inherit)
 
     project_path = pathlib.Path.cwd()
