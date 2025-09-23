@@ -3,6 +3,7 @@ import os
 import pathlib
 import subprocess
 import importlib
+from typing import NoReturn
 from os import getcwd
 from pathlib import Path
 from string import Template
@@ -17,7 +18,6 @@ from rich.prompt import Prompt, Confirm
 from rich.panel import Panel
 from rich.table import Table
 from qyro._store import QYRO_INTERNAL_STATE
-from .templates.component import COMPONENT_TEMPLATE
 from qyro.cli_engine import CLI
 from qyro.utils import EngineMessage, EngineError, module_exists
 from qyro.utils.fs import QYRO_METADATA, replicate_and_filter, write_safely_from_template, check_existing_project
@@ -25,34 +25,57 @@ from qyro.utils.parsers import to_camel_case
 from qyro.utils.project_reader import get_project_settings, _find_and_store_settings, _validate_project_structure
 from qyro.utils.helpers import valid_version
 from qyro.pipelines import get_freezer
-from typing import NoReturn
+from qyro.cli_commands.templates.component import QT_COMPONENT_TEMPLATE
 
 console = Console()
 
-@CLI(help='Show the engine version.')
+custom_style = Style([
+    ('qmark', 'fg:#ff00ff bold'),
+    ('question', 'fg:#00ffff bold'),
+    ('answer', 'fg:#00ffff bold'),
+    ('pointer', 'fg:#ffff00 bold'),
+    ('highlighted', 'fg:#2fe784 bold'),
+    ('selected', 'fg:#2fe784 bold'),
+])
+bindings_template_map = {
+    "PyQt5": "qt_boilerplate",
+    "PyQt6": "qt_boilerplate",
+    "PySide2": "qt_boilerplate",
+    "PySide6": "qt_boilerplate",
+    "kivy": "kivy_boilerplate",
+    "tkinter": "tk_boilerplate",
+}
+
+modules = ['PySide6', 'PyQt6', 'PyQt5', 'PySide2', 'kivy', 'tkinter']
+
+
+
+@CLI(help="Show the engine version.")
 def version():
     """
-    Displays the current version of the Qyro CLI.
+        Displays the current version of the Qyro CLI.
     """
     EngineMessage.show(f"Qyro v{QYRO_METADATA['version']}", level="info")
     sys.exit(0)
 
 
 @CLI(help="Initialize a new Qyro project.")
-def init(name: str = '.'):
+def init(name: str = "."):
     """
-    Initializes a new Qyro project with a standard folder structure.
+        Initializes a new Qyro project with a standard folder structure.
+
+        Args:
+            name (str, optional): The name of the project directory. Defaults to the current directory (".").
+        Raises:
+            EngineError: If the specified project directory already exists.
     """
-    # Convert project name to CamelCase
-    name = to_camel_case(name)
+    name = to_camel_case(name) if name != "." else "."
     project_path = abspath(name)
 
-    # Check if the project already exists
     if exists(project_path + "/src"):
         raise EngineError(
             f"Project folder already exists at: [bold]{project_path}[/bold]")
 
-    # Welcome message
     console.print(
         f"✨ Welcome to [bold green]{QYRO_METADATA['name']} v{QYRO_METADATA['version']}[/bold green] ✨\n")
     console.print(
@@ -60,35 +83,31 @@ def init(name: str = '.'):
         "with the necessary files and folders.\n"
     )
 
-    # Gather project details from the user
-    app = to_camel_case(Prompt.ask(
-        "App name", default=name if name != '.' else "MyApp"))
-    version = Prompt.ask("Version", default="1.0.0")
-    default_author = getuser().title()
-    author = Prompt.ask("Author", default=default_author)
+    # Hide app if user is using --name flag
+    if name == ".":
+        app = to_camel_case(Prompt.ask(
+        "App name", default="MyApp" if name == "." else name))
 
-    # Custom prompt styling
-    custom_style = Style([
-        ('qmark', 'fg:#ff00ff bold'),
-        ('question', 'fg:#00ffff bold'),
-        ('answer', 'fg:#00ffff bold'),
-        ('pointer', 'fg:#ffff00 bold'),
-        ('highlighted', 'fg:#2fe784 bold'),
-        ('selected', 'fg:#2fe784 bold'),
-    ])
+    version = Prompt.ask("Version", default="1.0.0")
+
+    try:
+        default_author = getuser().title()
+    except Exception:
+        default_author = "Unknown"
+
+    author = Prompt.ask("Author", default=default_author)
 
     # Select Qt binding
     python_binding = select(
         "Select your Qt binding [PyQt5/PyQt6/PySide2/PySide6] (default: PySide6):",
-        choices=["PyQt5", "PyQt6", "PySide2", "PySide6", "Kivy (Experimental)"],
-        default="PySide6",
+        choices=["PyQt5", "PyQt6", "PySide2",
+                 "PySide6", "Kivy (Experimental)", "Tkinter"],
         style=custom_style
     ).ask()
 
-    if "Kivy (Experimental)" in python_binding:
-        python_binding = "Kivy"
+    if python_binding not in ["PyQt5", "PyQt6", "PySide2", "PySide6"]:
+        python_binding = python_binding.split()[0].lower()
 
-    # Generate example macOS bundle identifier
     eg_bundle_id = f"com.{author.lower().split()[0]}.{''.join(app.lower().split())}"
     mac_bundle_identifier = Prompt.ask(
         f"Mac bundle identifier (e.g. {eg_bundle_id}, optional)",
@@ -104,39 +123,39 @@ def init(name: str = '.'):
     table.add_row("Version:", f"[cyan]{version}[/cyan]")
     table.add_row("Author:", f"[cyan]{author}[/cyan]")
     table.add_row("Qt binding:", f"[cyan]{python_binding}[/cyan]")
-    table.add_row("Mac bundle identifier:",
-                  f"[cyan]{mac_bundle_identifier or '(none)'}[/cyan]")
+    table.add_row("Mac bundle identifier:", f"[cyan]{mac_bundle_identifier or '(none)'}[/cyan]")
 
     console.print(Panel(
         table, title="[bold]Please confirm your settings[/bold]", border_style="blue"))
 
-    # Confirm with the user
     if not Confirm.ask("Continue?"):
         console.print("[yellow]Operation aborted by user.[/yellow]")
         return
 
-    # Check if the selected Qt binding is installed
     console.print(
         f"\n🔎 Checking if [bold cyan]{python_binding}[/bold cyan] is installed...")
 
     if not module_exists(python_binding):
         EngineMessage.show(f"Installing {python_binding}...", level="info")
-        subprocess.run([sys.executable, '-m', 'pip',
-                       'install', python_binding])
-
-    console.print(
+        try:
+            subprocess.run([sys.executable, '-m', 'pip', 'install', python_binding], check=True)
+        except subprocess.CalledProcessError as e:
+            console.print(f"\n\n[red]❌ Failed to install [bold cyan]{python_binding}[/bold cyan]. Please check your internet connection and permissions, and try again.[/red]")
+            return
+        console.print(
         f"\n✅ [bold cyan]{python_binding}[/bold cyan] is installed!\n")
 
-    # Create project directories
     if project_path != getcwd():
         makedirs(project_path, exist_ok=True)
     src_path = join(project_path, "src")
-    makedirs(src_path, exist_ok=True)
-    console.print(
-        f"📂 Project folder '{name}/' created at: [bold]{project_path}[/bold]")
 
-    # Locate boilerplate templates
-    template_dir = pathlib.Path(__file__).resolve().parent / 'templates/boilerplate' if python_binding != "Kivy" else pathlib.Path(__file__).resolve().parent / 'templates/kivy_boilerplate'
+    makedirs(src_path, exist_ok=True)
+
+    template_dir = bindings_template_map.get(python_binding, "qt_boilerplate")
+    template_dir = (
+        pathlib.Path(__file__).resolve().parent / f"templates/{template_dir}"
+    )
+
     if not template_dir.exists():
         raise EngineError(
             f"Template directory not found at: [bold]{template_dir}[/bold]")
@@ -149,7 +168,6 @@ def init(name: str = '.'):
             'app_name': app,
             'author': author,
             'mac_bundle_identifier': mac_bundle_identifier,
-            'python_bindings': python_binding,
             'binding': python_binding,
             'version': version
         },
@@ -160,12 +178,8 @@ def init(name: str = '.'):
         ]
     )
 
-    # TODO: Mensaje que cambie dinámicamente si hay --name para indicar que primero se mueva a la carpeta del proyecto
-
-    console.print(
-        f"\n🎉 [bold green]Project created successfully at {project_path}/ directory 🎉[/bold green]\n"
-        f"\nNow you can run:\n\n    [bold cyan]{QYRO_METADATA['name']} start[/bold cyan]"
-    )
+    console.print(f"\n🎉 [bold green]Project created successfully, now you can navigate to it:\n\n    [bold cyan]cd {name}[/bold cyan]")
+    console.print("\nThen, you can run:\n\n    [bold cyan]qyro start[/bold cyan]\n")
 
 
 @CLI(help="Create a new component or view")
@@ -196,7 +210,7 @@ def create(type: str = None, name: str = None, inherit: str = None):
     if not inherit:
         inherit = text("Inherit from: ", default="QtWidget").ask()
 
-    template = Template(COMPONENT_TEMPLATE)
+    template = Template(QT_COMPONENT_TEMPLATE)
     code = template.substitute(Binding=binding, Name=name, Widget=inherit)
 
     project_path = pathlib.Path.cwd()
@@ -221,17 +235,17 @@ def start():
     _find_and_store_settings()
     project_dir = _validate_project_structure()
 
-    if not module_exists('PySide6') and not module_exists('PyQt6') and not module_exists('PyQt5') and not module_exists('PySide2'):
+    if not any(module_exists(name) for name in modules):
         raise EngineError(
-            "At least one of the following modules must be installed:"
-            " [bold cyan]PySide6[/bold cyan], [bold cyan]PyQt6[/bold cyan], [bold cyan]PyQt5[/bold cyan], [bold cyan]PySide2[/bold cyan]"
-            "\n\nYou can install them using pip:"
-            "\n\n[bold green]pip install PySide6[/bold green]"
-            "\n[bold green]pip install PySide2[/bold green]"
-            "\n[bold green]pip install PyQt6[/bold green]"
-            "\n[bold green]pip install PyQt5[/bold green]"
-            "\n\nIf you have already installed one of these modules, make sure it is in your PYTHONPATH."
-        )
+        "At least one of the following modules must be installed:"
+        " [bold cyan]PySide6[/bold cyan], [bold cyan]PyQt6[/bold cyan], [bold cyan]PyQt5[/bold cyan], [bold cyan]PySide2[/bold cyan], [bold cyan]kivy[/bold cyan], [bold cyan]tkinter[/bold cyan]"
+        "\n\nYou can install them using pip:"
+        "\n\n[bold green]pip install PySide6[/bold green]"
+        "\n[bold green]pip install PySide2[/bold green]"
+        "\n[bold green]pip install PyQt6[/bold green]"
+        "\n[bold green]pip install PyQt5[/bold green]"
+        "\n\nIf you have already installed one of these modules, make sure it is in your PYTHONPATH."
+    )
     env = os.environ.copy()
     src_path = str(pathlib.Path(project_dir) / "src" / "main" / "python")
     old_pythonpath = env.get("PYTHONPATH", "")
@@ -250,7 +264,6 @@ def start():
     except FileNotFoundError:
         raise EngineError(
             "Python interpreter not found. Make sure Python is correctly installed.")
-
 
 
 @CLI(help="Build the project")
@@ -282,7 +295,8 @@ def build(profile: str | bool = None, bundle: bool = False):
            with the 'debug' argument set according to the build profile.
     """
     check_existing_project()
-    console.print("⏳ Freezing your app... \n\nThis may take a while, please be patient.")
+    console.print(
+        "⏳ Freezing your app... \n\nThis may take a while, please be patient.")
 
     if profile is None:
         profile = QYRO_INTERNAL_STATE.get_config("settings")['release']
@@ -318,7 +332,9 @@ def build(profile: str | bool = None, bundle: bool = False):
 
     binary = join('target', _app["app_name"], _app["app_name"])
 
-    console.print(f"\n🎉 [bold green]Your app was frozen successfully! 🎉[/bold green]\n\nYou can find the executable at: [cyan]{binary}[/cyan].\n\nIf that doesn't work, see https://github.com/runesc/qyro-engine/issues to report the issue.")
+    console.print(
+        f"\n🎉 [bold green]Your app was frozen successfully! 🎉[/bold green]\n\nYou can find the executable at: [cyan]{binary}[/cyan].\n\nIf that doesn't work, see https://github.com/runesc/qyro-engine/issues to report the issue.")
+
 
 @CLI(help="Build the project")
 def freeze(profile: str | bool = None, bundle: bool = False) -> NoReturn:
@@ -326,6 +342,7 @@ def freeze(profile: str | bool = None, bundle: bool = False) -> NoReturn:
     Alias for the build command.
     """
     build(profile=profile, bundle=bundle)
+
 
 @CLI(help="Cleans the 'target' directory.")
 def clean():

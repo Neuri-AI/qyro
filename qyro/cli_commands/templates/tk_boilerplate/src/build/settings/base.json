@@ -1,0 +1,10 @@
+{
+    "app_name": "${app_name}",
+    "author": "${author}",
+    "main_module": "src/main/python/main.py",
+    "version": "${version}",
+    "binding": "${binding}",
+    "hidden_imports": [
+        "__future__"
+    ]
+}

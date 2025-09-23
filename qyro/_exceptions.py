@@ -5,7 +5,7 @@ console = Console(stderr=True)
 class EngineMessage:
     LEVEL_STYLES = {
         "error": ("❌", "bold red"),
-        "warning": ("⚠️", "bold yellow"),
+        "warning": ("⚠️ ", "bold yellow"),
         "info": ("ℹ️", "bold cyan"),
         "debug": ("🛠️", "bold magenta"),
         "critical": ("🚨", "bold red on white"),
@@ -17,7 +17,7 @@ class EngineMessage:
     def show(cls, message: str, level: str = "error", caller_info: str = ""):
         emoji, style = cls.LEVEL_STYLES.get(level, ("❌", "bold red"))
         caller_text = f" (called from {caller_info})" if caller_info else ""
-        console.print(f"\n\n{emoji} [{style}]{level.upper()}:[/{style}] {message}{caller_text}", highlight=False)
+        console.print(f"{emoji} [{style}]{level.upper()}:[/{style}] {message}{caller_text}", highlight=False)
 
 
 class EngineError(Exception):

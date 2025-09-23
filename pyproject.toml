@@ -61,8 +61,7 @@ dependencies = [
     "rich>=14.1.0",
     "watchdog>=6.0.0",
     "astor>=0.8.1",
-    "pillow>=11.3.0",
-    "kivy (>=2.3.1,<3.0.0)"
+    "pillow>=11.3.0"
 ]
 
 [project.optional-dependencies]
@@ -86,7 +85,8 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 packages = [
-    {include = "qyro"}
+    {include = "qyro"},
+    {include = "qyro_engine"}
 ]
 
 include = [
