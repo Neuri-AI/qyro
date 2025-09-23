@@ -13,7 +13,7 @@ class ${app_name}(QMainWindow):
 if __name__ == '__main__':
     appctxt = AppEngine()
     app = ${app_name}()
-    app.resize(800, 600)
+    app.setMinimumSize(640, 480)
     app.show()
     exec_func = getattr(appctxt.app, 'exec', appctxt.app.exec_)
     sys.exit(exec_func())
