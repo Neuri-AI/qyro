@@ -83,10 +83,10 @@ def init(name: str = "."):
         "with the necessary files and folders.\n"
     )
 
-    # Gather project details from the user
+    # Hide app if user is using --name flag
     if name == ".":
         app = to_camel_case(Prompt.ask(
-        "App name", default=name if name != "." else "MyApp"))
+        "App name", default="MyApp" if name == "." else name))
 
     version = Prompt.ask("Version", default="1.0.0")
 
