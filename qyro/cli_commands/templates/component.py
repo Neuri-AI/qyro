@@ -1,4 +1,4 @@
-COMPONENT_TEMPLATE = f"""
+QT_COMPONENT_TEMPLATE = f"""
 from qyro_engine.core.base import Component, bootstrap
 from qyro_engine.store import Pydux
 from $Binding.QtWidgets import $Widget
