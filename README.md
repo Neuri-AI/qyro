@@ -2,7 +2,7 @@
   <img src="https://ik.imagekit.io/kummiktgaiq/ppg/Qyro-logo.svg?updatedAt=1755215983279" alt="Qyro Logo" width="50%">
 </p>
 
-<h3 align="center">Qyro - <b>Q</b>t p<b>y</b>thon <b>R</b>esource <b>O</b>rchestrator</h3>
+<h3 align="center">Qyro</h3>
 
 ![GitHub Release](https://img.shields.io/github/v/release/runesc/qyro-engine?include_prereleases&display_name=release&color=stable)
 ![GitHub Issues](https://img.shields.io/github/issues/runesc/qyro-engine?color=%23ab7df8)
