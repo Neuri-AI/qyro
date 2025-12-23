@@ -1,5 +1,4 @@
 from os.path import abspath
-
 from qyro._store import QYRO_INTERNAL_STATE
 from qyro._exceptions import EngineError
 from qyro_engine._qyro import get_config_path, generate_core_profiles

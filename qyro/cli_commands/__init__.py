@@ -26,6 +26,7 @@ from qyro.utils.project_reader import get_project_settings, _find_and_store_sett
 from qyro.utils.helpers import valid_version
 from qyro.pipelines import get_freezer
 from qyro.cli_commands.templates.component import QT_COMPONENT_TEMPLATE
+from qyro.cli_commands.templates import binding_map
 
 console = Console()
 
@@ -169,7 +170,9 @@ def init(name: str = "."):
             'author': author,
             'mac_bundle_identifier': mac_bundle_identifier,
             'binding': python_binding,
-            'version': version
+            'version': version,
+            "alignment": binding_map[python_binding]['alignment'],
+            "exec_func": binding_map[python_binding]['exec_func']
         },
         files_to_filter=[
             'src/build/settings/base.json',

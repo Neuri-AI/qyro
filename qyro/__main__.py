@@ -3,9 +3,9 @@ import textwrap
 import logging
 import qyro
 from os import getcwd
-from .utils import EngineError, EngineMessage
-from .cli_engine import _create_arg_parser, _execute_command
-from . import cli_commands
+from qyro.utils import EngineError, EngineMessage
+from qyro.cli_engine import _create_arg_parser, _execute_command
+from qyro import cli_commands
 
 class WrappingStreamHandler(logging.StreamHandler):
     """
