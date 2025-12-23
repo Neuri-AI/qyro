@@ -81,27 +81,3 @@ QYRO is licensed under the MIT License. See the [LICENSE](LICENSE) file for deta
 
 
 
-## FAQ
-
-**Which platforms does QYRO support?**  
-QYRO builds and packages applications for Windows, macOS, Linux, Android, and iOS.
-
-**What GUI frameworks are compatible?**  
-Kivy, Tkinter, PyQt5, PySide2, PyQt6, and PySide6 are all supported.
-
-**Can I use QYRO for mobile apps?**  
-Yes, you can package your Python projects for Android and iOS.
-
-**Do I need to manually include assets and resources?**  
-No, QYRO handles packaging of icons, assets, configs, and resources automatically, just drop them in the designated folders.
-
-**Is there a graphical interface?**  
-Currently, QYRO offers a simple command-line interface (CLI).
-
-**What’s the license for QYRO?**  
-QYRO is released under the MIT license.
-
-**Where can I get help or report bugs?**  
-You can [open an issue](https://github.com/runesc/qyro-engine/issues) or check the docs for support.
-
-
