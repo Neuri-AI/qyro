@@ -102,7 +102,7 @@ def init(name: str = "."):
     python_binding = select(
         "Select your Qt binding [PyQt5/PyQt6/PySide2/PySide6] (default: PySide6):",
         choices=["PyQt5", "PyQt6", "PySide2",
-                 "PySide6", "Kivy (Experimental)", "Tkinter"],
+                 "PySide6", "Kivy", "Tkinter"],
         style=custom_style
     ).ask()
 
@@ -171,13 +171,14 @@ def init(name: str = "."):
             'mac_bundle_identifier': mac_bundle_identifier,
             'binding': python_binding,
             'version': version,
-            "alignment": binding_map[python_binding]['alignment'],
-            "exec_func": binding_map[python_binding]['exec_func']
+            "alignment": binding_map.get(python_binding, {}).get('alignment'),
+            "exec_func": binding_map.get(python_binding, {}).get('exec_func'),
         },
         files_to_filter=[
             'src/build/settings/base.json',
             'src/build/settings/mac.json',
-            'src/main/python/main.py'
+            'src/main/python/main.py',
+            "pyproject.toml",
         ]
     )
 

@@ -1,0 +1,79 @@
+[project]
+name = "${app_name}"
+version = "${version}"
+description = "Your app description here."
+authors = [
+    {name = "${author}", email = "your.email@example.com"}
+]
+license = {text = "MIT"}
+readme = "README.md"
+requires-python = ">=3.9,<3.15"
+keywords = [
+    "ppg",
+    "python",
+    "pyqt",
+    "pyside",
+    "desktop",
+    "application",
+    "generator",
+    "cli",
+    "component",
+    "state management",
+    "pydux",
+    "fbs",
+    "react",
+    "redux",
+    "app development",
+    "modular",
+    "scalable",
+    "lifecycle",
+    "component-based",
+    "pyside6",
+    "pyqt6",
+    "pyqt5",
+    "pyqt6 generator",
+    "pyqt5 generator",
+    "pyside6 generator",
+    "pyside5 generator",
+    "pyqt6 app",
+    "pyqt5 app",
+    "pyside6 app",
+    "pyside5 app",
+    "app generator"
+]
+classifiers = [
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+]
+
+dependencies = [
+]
+
+
+[project.urls]
+Homepage = "https://github.com/neuri-ai/qyro"
+Repository = "https://github.com/neuri-ai/qyro"
+Documentation = "https://qyro.neuri.ai"
+"Bug Tracker" = "https://github.com/neuri-ai/qyro/issues"
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry]
+packages = [
+
+]
+
+include = [
+]
+
+exclude = ["tests", "tests.*"]
