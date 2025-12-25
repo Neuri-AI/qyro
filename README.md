@@ -2,7 +2,7 @@
   <img src="https://ik.imagekit.io/kummiktgaiq/ppg/Qyro-logo.svg?updatedAt=1755215983279" alt="Qyro Logo" width="50%">
 </p>
 
-<h3 align="center">Qyro - <b>Q</b>t p<b>y</b>thon <b>R</b>esource <b>O</b>rchestrator</h3>
+<h3 align="center">Qyro</h3>
 
 ![GitHub Release](https://img.shields.io/github/v/release/runesc/qyro-engine?include_prereleases&display_name=release&color=stable)
 ![GitHub Issues](https://img.shields.io/github/issues/runesc/qyro-engine?color=%23ab7df8)
@@ -79,29 +79,5 @@ QYRO is licensed under the MIT License. See the [LICENSE](LICENSE) file for deta
 - [Runesc](https://github.com/runesc)
 - [Neuri AI](https://neuri.ai)
 
-
-
-## FAQ
-
-**Which platforms does QYRO support?**  
-QYRO builds and packages applications for Windows, macOS, Linux, Android, and iOS.
-
-**What GUI frameworks are compatible?**  
-Kivy, Tkinter, PyQt5, PySide2, PyQt6, and PySide6 are all supported.
-
-**Can I use QYRO for mobile apps?**  
-Yes, you can package your Python projects for Android and iOS.
-
-**Do I need to manually include assets and resources?**  
-No, QYRO handles packaging of icons, assets, configs, and resources automatically, just drop them in the designated folders.
-
-**Is there a graphical interface?**  
-Currently, QYRO offers a simple command-line interface (CLI).
-
-**What’s the license for QYRO?**  
-QYRO is released under the MIT license.
-
-**Where can I get help or report bugs?**  
-You can [open an issue](https://github.com/runesc/qyro-engine/issues) or check the docs for support.
 
 
