@@ -1,7 +1,9 @@
 import importlib
-from functools import lru_cache, wraps
-from typing import Callable, TypeVar, Any
+import sys
+import logging
+from typing import Callable, TypeVar, Any, Union
 from collections import namedtuple
+from functools import lru_cache, wraps
 from qyro.utils.platform import EngineError, windows_based, mac_based
 from qyro_engine.utils import app_is_frozen
 from qyro_engine._signal import QtSignalHandler
@@ -9,15 +11,17 @@ from qyro_engine._frozen import load_frozen_build_settings, get_frozen_resource_
 from qyro_engine._source import find_project_root_directory, get_project_resource_locations, load_build_configurations
 from qyro_engine.utils.resources import FileLocator
 from qyro_engine.exceptions.excepthooks import StderrExceptionHandler, _Excepthook
-import sys
-import logging
+
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 _T = TypeVar('_T')
-QtBinding = namedtuple('QtBinding', ['QApplication', 'QIcon', 'QAbstractSocket'])
+QtBinding = namedtuple(
+    'QtBinding', ['QApplication', 'QIcon', 'QAbstractSocket'])
+TkBinding = namedtuple('TkBinding', ['Tk', 'PhotoImage'])
 available_bindings = {}
+
 
 def lazy_property(func: Callable[[Any], _T]) -> _T:
     @wraps(func)
@@ -26,57 +30,66 @@ def lazy_property(func: Callable[[Any], _T]) -> _T:
         return func(self)
     return property(wrapper)
 
-def load_qt_binding(binding_name: str) -> QtBinding:
-    try:
-        if binding_name == 'PyQt5':
-            widgets = importlib.import_module('PyQt5.QtWidgets')
-            gui = importlib.import_module('PyQt5.QtGui')
-            network = importlib.import_module('PyQt5.QtNetwork')
-        elif binding_name == 'PyQt6':
-            widgets = importlib.import_module('PyQt6.QtWidgets')
-            gui = importlib.import_module('PyQt6.QtGui')
-            network = importlib.import_module('PyQt6.QtNetwork')
-        elif binding_name == 'PySide2':
-            widgets = importlib.import_module('PySide2.QtWidgets')
-            gui = importlib.import_module('PySide2.QtGui')
-            network = importlib.import_module('PySide2.QtNetwork')
-        elif binding_name == 'PySide6':
-            widgets = importlib.import_module('PySide6.QtWidgets')
-            gui = importlib.import_module('PySide6.QtGui')
-            network = importlib.import_module('PySide6.QtNetwork')
-        else:
-            raise ValueError(f"Unknown binding: {binding_name}")
-    except ModuleNotFoundError as e:
-        raise ImportError(f"Cannot load Qt binding '{binding_name}'. Module not found: {e}")
 
-    return QtBinding(
-        QApplication=getattr(widgets, 'QApplication'),
-        QIcon=getattr(gui, 'QIcon'),
-        QAbstractSocket=getattr(network, 'QAbstractSocket')
-    )
+def load_binding(binding_name: str) -> Union[QtBinding, TkBinding]:
+    """This ensures that the specified binding is loaded and available.
+
+    Args:
+        binding_name (str): The name of the binding to load (e.g., 'PyQt5', 'PySide6', 'Tkinter').
+
+    Raises:
+        ValueError: If the specified binding name is unknown.
+        ImportError: If the required modules for the binding cannot be imported.
+
+    Returns:
+        Union[QtBinding, TkBinding]: The loaded binding object.
+    """
+    try:
+        if binding_name == 'PyQt5' or binding_name == 'PyQt6' or binding_name == 'PySide2' or binding_name == 'PySide6':
+            widgets = importlib.import_module(f'{binding_name}.QtWidgets')
+            gui = importlib.import_module(f'{binding_name}.QtGui')
+            network = importlib.import_module(f'{binding_name}.QtNetwork')
+            return QtBinding(
+                QApplication=getattr(widgets, 'QApplication'),
+                QIcon=getattr(gui, 'QIcon'),
+                QAbstractSocket=getattr(network, 'QAbstractSocket')
+            )
+
+        if binding_name == 'tkinter':
+            try:
+                import tkinter as tk
+                return TkBinding(Tk=tk.Tk, PhotoImage=tk.PhotoImage)
+            except ImportError as e:
+                raise ImportError(f"Cannot load tkinter: {e}")
+        raise ValueError(f"Unknown binding name: {binding_name}")
+    except ModuleNotFoundError as e:
+        raise ImportError(
+            f"Cannot load Qt binding '{binding_name}'. Module not found: {e}")
+
 
 class _AppEngine:
     """
     Base engine para apps Qt con bindings dinámicos.
     """
     preferred_binding = 'PySide6'
-    _qt_binding = None
+    _binding = None
 
     def __init__(self, argv: list[str] = None):
-        if argv is None:
-            argv = sys.argv
-        self._argv = argv
+        self._argv = argv or sys.argv
 
-        # Carga el binding
-        if self._qt_binding is None:
-            self._qt_binding = self.preferred_binding
-        available_bindings[self._qt_binding] = load_qt_binding(self._qt_binding)
+        if not self._binding:
+            self._binding = self.preferred_binding
 
-        # Creamos la app
+        available_bindings[self._binding] = load_binding(self._binding)
+
         self.app = self.get_application_instance
 
-        # Configuramos icono si aplica
-        if self.set_app_icon:
+        if not self.set_app_icon:
+            return
+
+        if self._binding == "tkinter":
+            self._set_tkinter_icon()
+        else:
             self.app.setWindowIcon(self.set_app_icon)
 
         # Manejo de excepciones y señales
@@ -84,35 +97,49 @@ class _AppEngine:
         self.install_exception_hook()
         self.setup_signal_handler()
 
+    def _set_tkinter_icon(self):
+        binding = available_bindings[self._binding]
+        self.app.iconphoto(True, binding.PhotoImage(file=self._resource('Icon.ico')))
+
     @staticmethod
-    def _validate_qt_binding(binding_name: str, binding: QtBinding):
+    def _validate_binding(binding_name: str, binding: QtBinding):
         if not isinstance(binding, QtBinding):
             raise TypeError(f"Invalid Qt binding type for '{binding_name}'")
         if binding.QApplication is None:
-            raise ValueError(f"QApplication class not found for binding '{binding_name}'")
+            raise ValueError(
+                f"QApplication class not found for binding '{binding_name}'")
 
     @lazy_property
     def get_application_instance(self):
-        binding = available_bindings[self._qt_binding]
-        self._validate_qt_binding(self._qt_binding, binding)
+        binding = available_bindings[self._binding]
         build_settings = self.load_build_settings()
 
-        app = binding.QApplication(self._argv)
-        app.setApplicationName(build_settings.get('app_name', 'App'))
-        app.setApplicationVersion(build_settings.get('version', '1.0'))
-        return app
+        if self._binding == "tkinter":
+            app_instance = binding.Tk()
+            app_instance.title(build_settings.get('app_name', 'Qyro App'))
+
+            app_instance.exec_ = app_instance.mainloop
+            return app_instance
+
+        else:
+            self._validate_binding(self._binding, binding)
+            app = binding.QApplication(self._argv)
+            app.setApplicationName(build_settings.get('app_name', 'Qyro App'))
+            app.setOrganizationName(
+                build_settings.get('organization_name', 'Qyro'))
+            app.setApplicationVersion(build_settings.get('version', '1.0.0'))
+            return app
 
     @lazy_property
     def get_resource_locator(self):
         if app_is_frozen():
-            # Cuando está compilado, usa las carpetas dentro del bundle
+            # For frozen applications
             resource_dirs = get_frozen_resource_dirs()
         else:
-            # Modo desarrollo
+            # For runtime applications (not frozen)
             project_root = find_project_root_directory()
             resource_dirs = get_project_resource_locations(project_root)
         return FileLocator(resource_dirs)
-
 
     def _resource(self, path):
         return self.get_resource_locator.find(path)
@@ -121,15 +148,24 @@ class _AppEngine:
     def set_app_icon(self):
         if mac_based():
             return None
-        binding = available_bindings[self._qt_binding]
+
+        binding = available_bindings[self._binding]
+
+        if self._binding == 'tkinter':
+            return self._resource('Icon.ico')
+
         return binding.QIcon(self._resource('Icon.ico'))
 
     def install_exception_hook(self):
         _Excepthook(self.exception_handler)
 
     def setup_signal_handler(self):
+
+        if self._binding == 'tkinter':
+            return
+
         if not windows_based():
-            binding = available_bindings[self._qt_binding]
+            binding = available_bindings[self._binding]
             QtSignalHandler(self.app, binding.QAbstractSocket).install()
 
     def load_build_settings(self) -> dict:
