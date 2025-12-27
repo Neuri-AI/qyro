@@ -20,6 +20,7 @@ _T = TypeVar('_T')
 QtBinding = namedtuple(
     'QtBinding', ['QApplication', 'QIcon', 'QAbstractSocket'])
 TkBinding = namedtuple('TkBinding', ['Tk', 'PhotoImage'])
+KivyBinding = namedtuple('KivyBinding', ['App', 'Window', 'Config'])
 available_bindings = {}
 
 
@@ -31,7 +32,7 @@ def lazy_property(func: Callable[[Any], _T]) -> _T:
     return property(wrapper)
 
 
-def load_binding(binding_name: str) -> Union[QtBinding, TkBinding]:
+def load_binding(binding_name: str) -> Union[QtBinding, TkBinding, KivyBinding]:
     """This ensures that the specified binding is loaded and available.
 
     Args:
@@ -55,12 +56,22 @@ def load_binding(binding_name: str) -> Union[QtBinding, TkBinding]:
                 QAbstractSocket=getattr(network, 'QAbstractSocket')
             )
 
+        if binding_name == 'kivy':
+            kivy_app = importlib.import_module('kivy.app')
+            kivy_core_window = importlib.import_module('kivy.core.window')
+            kivy_config = importlib.import_module('kivy.config')
+            return KivyBinding(
+                App=getattr(kivy_app, 'App'),
+                Window=getattr(kivy_core_window, 'Window'),
+                Config=getattr(kivy_config, 'Config')
+            )
+
         if binding_name == 'tkinter':
-            try:
-                import tkinter as tk
-                return TkBinding(Tk=tk.Tk, PhotoImage=tk.PhotoImage)
-            except ImportError as e:
-                raise ImportError(f"Cannot load tkinter: {e}")
+            tk = importlib.import_module('tkinter')
+            return TkBinding(
+                Tk=getattr(tk, 'Tk'),
+                PhotoImage=getattr(tk, 'PhotoImage')
+            )
         raise ValueError(f"Unknown binding name: {binding_name}")
     except ModuleNotFoundError as e:
         raise ImportError(
@@ -89,7 +100,8 @@ class _AppEngine:
 
         if self._binding == "tkinter":
             self._set_tkinter_icon()
-        else:
+
+        if self._binding not in ['kivy', 'tkinter']:
             self.app.setWindowIcon(self.set_app_icon)
 
         # Manejo de excepciones y señales
@@ -99,7 +111,11 @@ class _AppEngine:
 
     def _set_tkinter_icon(self):
         binding = available_bindings[self._binding]
-        self.app.iconphoto(True, binding.PhotoImage(file=self._resource('Icon.ico')))
+        try:
+            self.app.iconphoto(True, binding.PhotoImage(
+                file=self._resource('Icon.ico')))
+        except EngineError as e:
+            logger.warning(f"Failed to set Tkinter icon: {e}")
 
     @staticmethod
     def _validate_binding(binding_name: str, binding: QtBinding):
@@ -119,6 +135,29 @@ class _AppEngine:
             app_instance.title(build_settings.get('app_name', 'Qyro App'))
 
             app_instance.exec_ = app_instance.mainloop
+            return app_instance
+
+        elif self._binding == "kivy":
+            if not self._resource('Icon.png') or not self._resource('Icon.ico'):
+                raise EngineError("Icon file not found for Kivy application.")
+
+            icon_path = self._resource('Icon.png')
+            if not icon_path:
+                icon_path = self._resource('Icon.ico')
+
+            class QyroKivyApp(binding.App):
+                def build(self):
+                    # Kivy Calls to build() when running the app
+                    # We allow the user to inject their root widget into 'self.user_root'
+                    # before calling exec_().
+                    return getattr(self, 'user_root', None)
+
+            app_instance = QyroKivyApp()
+            app_instance.title = build_settings.get('app_name', 'Qyro App')
+            app_instance.icon = icon_path
+
+            # override exec_ to call run()
+            app_instance.exec_ = app_instance.run
             return app_instance
 
         else:
@@ -151,7 +190,7 @@ class _AppEngine:
 
         binding = available_bindings[self._binding]
 
-        if self._binding == 'tkinter':
+        if self._binding in ['tkinter', 'kivy']:
             return self._resource('Icon.ico')
 
         return binding.QIcon(self._resource('Icon.ico'))
@@ -161,7 +200,7 @@ class _AppEngine:
 
     def setup_signal_handler(self):
 
-        if self._binding == 'tkinter':
+        if self._binding in ['tkinter', 'kivy']:
             return
 
         if not windows_based():
