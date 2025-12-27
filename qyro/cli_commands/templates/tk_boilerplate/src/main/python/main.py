@@ -1,20 +1,22 @@
 import sys
 import tkinter as tk
-from tkinter import ttk
+from qyro_engine.core.tkinter import AppEngine
 
-class ${app_name}(tk.Tk):
-    def __init__(self):
-        super().__init__()
-        self.title("${app_name}")
-        self.geometry("300x100")
+class ${app_name}:
+    def __init__(self, root):
+        self.root = root
         self.render_()
 
     def render_(self):
-        label = ttk.Label(self, text="Hello, from Qyro!")
-        label.pack(expand=True, anchor="center")
+        label = tk.Label(self.root, text="Hello, from Tkinter with Qyro!")
+        label.pack(expand=True)
 
 if __name__ == "__main__":
-    app = ${app_name}()
-    app.mainloop()
-    sys.exit(0)
+    appctxt = AppEngine()
 
+    root = appctxt.app
+    root.minsize(640, 480)
+
+    app = ${app_name}(root)
+    exec_func = root.exec_
+    sys.exit(exec_func())
