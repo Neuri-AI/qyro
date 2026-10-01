@@ -1,98 +1,35 @@
-[project]
+[tool.poetry]
 name = "qyro"
-version = "1.0.0"
-description = "QYRO is a lightweight and powerful Python/Qt application packager. It helps you orchestrate, organize, and package all your project resources into standalone executables and installers for multiple platforms."
-authors = [
-    {name = "Neuri", email = "info@neuri.ai"}
-]
-license = {text = "MIT"}
+version = "0.1.0"
+description = "Clean Architecture runtime engine and lifecycle framework for Python desktop GUI applications (Qt, Kivy, Tkinter)"
+authors = ["Qyro Team"]
+license = "MIT"
 readme = "README.md"
-requires-python = ">=3.9,<3.15"
-keywords = [
-    "ppg",
-    "python",
-    "pyqt",
-    "pyside",
-    "desktop",
-    "application",
-    "generator",
-    "cli",
-    "component",
-    "state management",
-    "pydux",
-    "fbs",
-    "react",
-    "redux",
-    "app development",
-    "modular",
-    "scalable",
-    "lifecycle",
-    "component-based",
-    "pyside6",
-    "pyqt6",
-    "pyqt5",
-    "pyqt6 generator",
-    "pyqt5 generator",
-    "pyside6 generator",
-    "pyside5 generator",
-    "pyqt6 app",
-    "pyqt5 app",
-    "pyside6 app",
-    "pyside5 app",
-    "app generator"
-]
-classifiers = [
-    "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
-    "Operating System :: OS Independent",
-    "Topic :: Software Development :: Libraries",
-    "Topic :: Software Development :: Libraries :: Python Modules",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
-    "Programming Language :: Python :: 3.13",
-    "Programming Language :: Python :: 3.14",
-]
+packages = [{include = "qyro"}]
 
-dependencies = [
-    "pyinstaller>=6.15.0",
-    "pydantic>=2.11.7",
-    "questionary>=2.1.0",
-    "rich>=14.1.0",
-    "watchdog>=6.0.0",
-    "astor>=0.8.1",
-    "pillow>=11.3.0"
-]
+[tool.poetry.dependencies]
+python = ">=3.10,<3.16"
 
-[project.optional-dependencies]
-licensing = ["rsa>=3.4.2"]
-sentry = ["sentry-sdk>=0.6.6"]
-upload = ["boto3"]
+PySide6 = {version = ">=6.5.0", optional = true, python = ">=3.11,<3.15"}
+PyQt6 = {version = ">=6.5.0", optional = true, python = ">=3.11,<3.15"}
+PySide2 = {version = ">=5.15.0", optional = true, python = "<3.11"}
+PyQt5 = {version = ">=5.15.0", optional = true, python = ">=3.11,<3.14"}
+kivy = {version = ">=2.2.0", optional = true}
+sentry-sdk = {version = ">=1.30.0", optional = true}
 
-[project.scripts]
-qyro = "qyro.__main__:main"
-ppg = "qyro.__main__:main"
+[tool.poetry.extras]
+pyside6 = ["PySide6"]
+pyqt6 = ["PyQt6"]
+pyside2 = ["PySide2"]
+pyqt5 = ["PyQt5"]
+kivy = ["kivy"]
+sentry = ["sentry-sdk"]
+all = ["PySide6", "PyQt6", "PySide2", "PyQt5", "kivy", "sentry-sdk"]
 
-[project.urls]
-Homepage = "https://github.com/runesc/qyro-engine"
-Repository = "https://github.com/runesc/qyro-engine"
-Documentation = "https://qyro-engine.readthedocs.io"
-"Bug Tracker" = "https://github.com/runesc/qyro-engine/issues"
+[tool.poetry.group.dev.dependencies]
+pytest = ">=8.0.0"
+pytest-cov = ">=4.1.0"
 
 [build-system]
-requires = ["poetry-core>=2.0.0,<3.0.0"]
+requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
-
-[tool.poetry]
-packages = [
-    {include = "qyro"},
-    {include = "qyro_engine"}
-]
-
-include = [
-    "qyro/_default_settings/**/*",
-    "qyro/cli_commands/boilerplate/**/*",
-    "package.json"
-]
-
-exclude = ["tests", "tests.*"]

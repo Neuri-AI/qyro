@@ -1,51 +1,77 @@
-from os.path import abspath
-from qyro._store import QYRO_INTERNAL_STATE
-from qyro._exceptions import EngineError
-from qyro_engine._qyro import get_config_path, generate_core_profiles
-from qyro_engine._source import _get_settings_paths
-from qyro_engine._settings import load_json_configs, resolve_placeholders
-from qyro_engine._source import path as _source_path
+"""
+Qyro.
+Clean Architecture runtime engine and lifecycle framework for Python desktop GUI apps.
+Decoupled from CLI tools, independent and multi-toolkit ready.
+"""
 
-def init(project_dir: str):
-    """
-    Initializes Qyro for a given project directory. Loads core settings and
-    activates default profiles.
-    """
-    PROJECT_DIR = abspath(project_dir)
-    core_config = get_config_path(PROJECT_DIR)["project_dir"]
+from qyro.client.context import ApplicationContext
+from qyro.client.component import Component, init_lifecycle, PPGLifeCycle
+from qyro.container import EngineContainer
+from qyro.adapters.platform.detector import PlatformDetector
+from qyro.domain.entities import PlatformType, ExecutionMode, AppMetadata
+from qyro.domain.errors import (
+    QyroEngineError,
+    ResourceNotFoundError,
+    SettingsNotFoundError,
+    FrameworkNotAvailableError,
+)
 
-    QYRO_INTERNAL_STATE.set_config('settings', {'project_dir': core_config})
+__version__ = "0.1.0"
 
-    for profile in generate_core_profiles():
-        enable_profile(profile)
-
-
-def enable_profile(profile: str):
-    """
-    Loads a specific profile's settings and merges them into the global state.
-    """
-    PROJECT_DIR = QYRO_INTERNAL_STATE.get_config('settings')['project_dir']
-    QYRO_INTERNAL_STATE.mount_profile(profile)
-
-    json_paths = _get_settings_paths(PROJECT_DIR, QYRO_INTERNAL_STATE._loaded_profiles)
-    core_config = get_config_path(PROJECT_DIR)
-
-    merged_settings = load_json_configs(json_paths, core_config)
-    QYRO_INTERNAL_STATE.set_config('settings', merged_settings)
+# Module-level singleton container for quick procedural usage
+_default_container: EngineContainer | None = None
 
 
+def _get_default_container() -> EngineContainer:
+    global _default_container
+    app_container = ApplicationContext._global_container
+    if app_container is not None:
+        _default_container = app_container
+        return app_container
 
-def path(path: str) -> str:
-    """
-    Returns the absolute path of a file in the project directory.
-    Supports placeholders like `${freeze_dir}`.
-    """
-    settings = QYRO_INTERNAL_STATE.get_config('settings')
-    path = resolve_placeholders(path, settings)
+    if _default_container is None:
+        _default_container = EngineContainer()
+    return _default_container
 
-    try:
-        PROJECT_DIR = QYRO_INTERNAL_STATE.get_config('settings')['project_dir']
-    except KeyError:
-        raise EngineError("Cannot call path(...) until init(...) has been called.") from None
 
-    return _source_path(PROJECT_DIR, path)
+def get_resource(*segments: str, required: bool = True) -> str:
+    """Convenience helper to resolve resource path without manually creating ApplicationContext."""
+    container = _get_default_container()
+    return str(container.resolve_resource_use_case.execute(*segments, required=required))
+
+
+def load_build_settings() -> dict:
+    """Convenience helper to load build settings dictionary."""
+    container = _get_default_container()
+    return container.load_settings_use_case.execute().raw_settings
+
+
+def is_frozen() -> bool:
+    """Convenience helper to check if running in a frozen executable."""
+    container = _get_default_container()
+    return container.env_adapter.is_frozen()
+
+
+# Backward compatibility alias
+app_is_frozen = is_frozen
+
+
+__all__ = [
+    "ApplicationContext",
+    "Component",
+    "init_lifecycle",
+    "PPGLifeCycle",
+    "EngineContainer",
+    "PlatformDetector",
+    "PlatformType",
+    "ExecutionMode",
+    "AppMetadata",
+    "QyroEngineError",
+    "ResourceNotFoundError",
+    "SettingsNotFoundError",
+    "FrameworkNotAvailableError",
+    "get_resource",
+    "load_build_settings",
+    "is_frozen",
+    "app_is_frozen",
+]
