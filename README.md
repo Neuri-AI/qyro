@@ -213,7 +213,6 @@ Exports:
 
 * ApplicationContext
 * Component
-* PPGLifeCycle (compat alias of Component)
 * EngineContainer
 * PlatformDetector
 * PlatformType
