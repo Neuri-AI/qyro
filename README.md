@@ -145,6 +145,39 @@ if __name__ == "__main__":
 
 ```
 
+## Quick start (Kivy)
+
+```python
+from kivy.app import App
+from kivy.uix.label import Label
+from kivy.core.window import Window
+from qyro import ApplicationContext
+from qyro.ui.component import Component
+
+
+class Kv(App, Component, ApplicationContext):
+
+    def component_will_mount(self):
+        Window.size = (640, 480)
+
+    def render(self):
+        label = Label(
+            text=(
+                f"Hello, World!\n\n"
+                f"App Title: {self.window_title}\n"
+                f"Platform: {self.platform.value} (Frozen: {self.is_frozen})\n\n"
+            ),
+            halign="left",
+            valign="middle",
+        )
+        label.bind(size=label.setter("text_size"))
+        return label
+
+    def build(self):
+        return self.render()
+
+```
+
 ## Quick start (Tkinter)
 
 ```python
