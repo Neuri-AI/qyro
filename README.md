@@ -6,9 +6,6 @@
 
 > **Runtime engine for Python GUI apps with a shared application context.**
 
-> [!NOTE]
-> **Need the Qyro automation and build tools?** This repository contains the **Qyro Runtime**, which provides the application context, framework adapters, resource handling, and component lifecycle for Python GUI applications. For **project scaffolding, build automation, packaging, distribution, code signing, and release workflows**, see **[Qyro CLI](https://github.com/Neuri-AI/qyro-cli)**.
-
 
 [![Python](https://img.shields.io/badge/Python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13%20%7C%203.14%20%7C%203.15-blue.svg)](https://python.org)
 ![GitHub Release](https://img.shields.io/github/v/release/runesc/qyro?include_prereleases&display_name=release&color=stable)
@@ -18,6 +15,10 @@
 ![GitHub stars](https://img.shields.io/github/stars/runesc/qyro)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Sponsor](https://img.shields.io/badge/Sponsor-Buy%20Me%20a%20Coffee-FFDD00?logo=buymeacoffee&logoColor=000000)](https://buymeacoffee.com/neuri)
+
+
+> [!NOTE]
+> **Need the Qyro automation and build tools?** This repository contains the **Qyro Runtime**, which provides the application context, framework adapters, resource handling, and component lifecycle for Python GUI applications. For **project scaffolding, build automation, packaging, distribution, code signing, and release workflows**, see **[Qyro CLI](https://github.com/Neuri-AI/qyro-cli)**.
 
 
 ## What it is
