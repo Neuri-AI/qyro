@@ -357,10 +357,27 @@ Utility methods:
 * Resource resolver: qyro/adapters/resources/filesystem_resources.py
 * Settings loader: qyro/adapters/settings/json_settings.py
 
-## Status
+## 🤝 Contributing
 
-Version in this repository snapshot:
+Contributions to `qyro` and the Qyro ecosystem are welcome.
 
-* qyro 0.1.0
+1. Fork the repository on GitHub.
+2. Create your feature branch (`git checkout -b feature/amazing-feature`).
+3. Run test suites (`poetry run pytest`).
+4. Commit your changes (`git commit -m 'feat: add amazing feature'`).
+5. Push to your branch (`git push origin feature/amazing-feature`).
+6. Open a Pull Request.
 
-The package is usable today for runtime concerns, but some ecosystem features live in qyro-cli or remain outside qyro scope.
+---
+
+## 📄 License
+
+MIT. See [LICENSE](LICENSE).
+
+---
+
+## 👥 Organization & Maintainers
+
+- **Organization:** [Neuri](https://github.com/Neuri-AI)
+- **Lead Maintainer:** Luis Alfredo De Los Reyes ([luisalfredoreyes98@gmail.com](mailto:luisalfredoreyes98@gmail.com))
+- **Ecosystem:** [Qyro](https://github.com/Neuri-AI/qyro) • [Qyro CLI](https://github.com/Neuri-AI/qyro-cli) • [Boilerplates](https://github.com/Neuri-AI)
