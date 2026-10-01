@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "qyro"
+name = "qyro-engine"
 version = "0.9.0"
 description = "Clean Architecture runtime engine and lifecycle framework for Python desktop GUI applications (Qt, Kivy, Tkinter)"
 authors = ["Qyro Team"]
