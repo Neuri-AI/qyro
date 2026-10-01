@@ -4,7 +4,7 @@
 
 # ⚡ Qyro Runtime
 
-> **Runtime engine for Python GUI apps with a shared application context.**
+> **Runtime engine for Python applications, providing a cross-platform foundation for desktop and mobile environments.**
 
 
 [![Python](https://img.shields.io/badge/Python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13%20%7C%203.14%20%7C%203.15-blue.svg)](https://python.org)
