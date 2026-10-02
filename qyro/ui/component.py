@@ -3,6 +3,6 @@ Qyro UI Component Module.
 Provides Component lifecycle architecture.
 """
 
-from qyro.client.component import Component, PPGLifeCycle
+from qyro.client.component import Component
 
-__all__ = ["Component", "PPGLifeCycle"]
+__all__ = ["Component"]

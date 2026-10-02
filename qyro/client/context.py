@@ -526,16 +526,3 @@ class ApplicationContext:
     def exec_(self) -> int:
         """Qt backward-compatibility alias for exec()."""
         return self.exec()
-
-
-def app_is_frozen() -> bool:
-    """Check if the current application is running inside a frozen executable."""
-    if ApplicationContext._global_container:
-        return ApplicationContext._global_container.env_adapter.is_frozen()
-    container = EngineContainer()
-    return container.env_adapter.is_frozen()
-
-
-# Alias for convenience
-is_frozen = app_is_frozen
-

@@ -5,7 +5,7 @@ Decoupled from CLI tools, independent and multi-toolkit ready.
 """
 
 from qyro.client.context import ApplicationContext
-from qyro.client.component import Component, PPGLifeCycle
+from qyro.client.component import Component
 from qyro.container import EngineContainer
 from qyro.adapters.platform.detector import PlatformDetector
 from qyro.domain.entities import PlatformType, ExecutionMode, AppMetadata
@@ -52,14 +52,10 @@ def is_frozen() -> bool:
     return container.env_adapter.is_frozen()
 
 
-# Backward compatibility alias
-app_is_frozen = is_frozen
-
 
 __all__ = [
     "ApplicationContext",
     "Component",
-    "PPGLifeCycle",
     "EngineContainer",
     "PlatformDetector",
     "PlatformType",
@@ -72,5 +68,4 @@ __all__ = [
     "get_resource",
     "load_build_settings",
     "is_frozen",
-    "app_is_frozen",
 ]

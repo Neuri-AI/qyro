@@ -535,6 +535,3 @@ class Component:
     ) -> None:
         """Sets the component properties."""
         self._props = value
-
-
-PPGLifeCycle = Component
