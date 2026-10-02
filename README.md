@@ -2,12 +2,17 @@
   <img src="https://ik.imagekit.io/kummiktgaiq/ppg/Qyro-logo.svg?updatedAt=1755215983279" alt="Qyro Logo" width="50%">
 </p>
 
+> [!WARNING]
+> **Qyro is currently in alpha.** APIs, adapters, and behavior may change between releases.
+> Desktop workflows are the current focus. Mobile support is not yet considered stable.
+
+
 # ⚡ Qyro Runtime
 
 > **Runtime engine for Python applications, providing a cross-platform foundation for desktop and mobile environments.**
 
 
-[![Python](https://img.shields.io/badge/Python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13%20%7C%203.14%20%7C%203.15-blue.svg)](https://python.org)
+[![Python](https://img.shields.io/badge/Python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13%20%7C%203.14-blue.svg)](https://python.org)
 ![GitHub Release](https://img.shields.io/github/v/release/runesc/qyro?include_prereleases&display_name=release&color=stable)
 ![GitHub Issues](https://img.shields.io/github/issues/runesc/qyro?color=%23ab7df8)
 ![GitHub Issues Closed](https://img.shields.io/github/issues-closed/runesc/qyro?color=green)
@@ -36,7 +41,6 @@ Qyro currently provides:
 Qyro is not the build/distribution CLI.
 
 - Build, bundle, signing, notarization: qyro-cli concern.
-- Hot reloading: not built into qyro.
 - Web bridge APIs from legacy PPG examples: not part of qyro public API.
 
 ## Supported UI adapters
@@ -56,6 +60,34 @@ Adapter selection behavior:
 - If binding/framework is provided in settings, it is used.
 - Otherwise the engine auto-detects in this order:
   PySide6 -> PyQt6 -> PySide2 -> PyQt5 -> Kivy -> Tkinter -> Headless
+
+## Compatibility
+
+A check mark indicates that the complete workflow has been validated for
+the specified framework, platform, and Python version.
+
+`init → start → build → bundle`
+
+| Framework | Platform | Python 3.10 | Python 3.11 | Python 3.12 | Python 3.13 | Python 3.14 |
+|---|---|---:|---:|---:|---:|---:|
+| PySide6 | Windows | — | — | — | — | — |
+| PySide6 | macOS | — | — | — | — | — |
+| PySide6 | Linux | — | — | — | — | — |
+| PyQt6 | Windows | — | — | — | — | — |
+| PyQt6 | macOS | — | — | — | — | — |
+| PyQt6 | Linux | — | — | — | — | — |
+| PyQt5 | Windows | — | — | — | — | — |
+| PyQt5 | macOS | — | — | — | — | — |
+| PyQt5 | Linux | — | — | — | — | — |
+| Kivy | Windows | — | — | — | — | — |
+| Kivy | macOS | — | — | — | — | — |
+| Kivy | Linux | — | — | — | — | — |
+| Tkinter | Windows | — | — | — | — | — |
+| Tkinter | macOS | — | — | — | — | — |
+| Tkinter | Linux | — | — | — | — | — |
+
+> Other combinations may work but have not yet been validated through the
+> complete workflow.
 
 ## Installation
 
@@ -115,6 +147,32 @@ my-app/
 
 ```
 
+## Qyro Settings Builder
+
+Configuring application settings and release options manually can be
+time-consuming and error-prone. The **Qyro Settings Builder** provides a
+visual interface for creating and managing the settings used by Qyro
+projects.
+
+It helps configure:
+
+- Application settings.
+- Platform-specific settings.
+- Resource-related options.
+- Release and packaging settings.
+- Distribution metadata.
+
+Use the online builder here:
+
+[Open Qyro Settings Builder](https://qyro-settings-builder.up.railway.app/)
+
+The generated configuration files can be placed in the project's `settings/`
+directory and reviewed or customized before running Qyro CLI commands.
+> [!NOTE]
+> The Settings Builder is an auxiliary tool for preparing configuration files.
+> The final settings remain part of your project and should be reviewed before
+> building or releasing an application.
+
 ## Quick start (Qt)
 
 ```python
@@ -141,7 +199,7 @@ class MyWindow(QMainWindow, Component, ApplicationContext):
 if __name__ == "__main__":
     window = MyWindow()
     window.show()
-    sys.exit(window.exec())
+    sys.exit(window.run())
 
 ```
 
@@ -155,7 +213,7 @@ from qyro import ApplicationContext
 from qyro.ui.component import Component
 
 
-class Kv(App, Component, ApplicationContext):
+class MyKvApp(App, Component, ApplicationContext):
 
     def component_will_mount(self):
         Window.size = (640, 480)
@@ -175,6 +233,9 @@ class Kv(App, Component, ApplicationContext):
 
     def build(self):
         return self.render()
+
+if __name__ == "__main__":
+    MyKvApp().run()
 
 ```
 
@@ -199,7 +260,7 @@ class MyTkApp(tk.Tk, Component, ApplicationContext):
 
 if __name__ == "__main__":
     app = MyTkApp()
-    app.exec()
+    app.run()
 
 ```
 
@@ -225,7 +286,6 @@ Exports:
 * get_resource
 * load_build_settings
 * is_frozen
-* app_is_frozen (compat alias)
 
 Function signatures:
 
@@ -240,7 +300,6 @@ Behavior notes:
 
 * get_resource returns an absolute path string.
 * If required=True and a resource is not found, the resolver may raise a runtime error.
-* app_is_frozen is an alias kept for compatibility.
 
 ### ApplicationContext
 
@@ -261,39 +320,37 @@ ApplicationContext(
 Parameter reference:
 
 | Parameter | Type | Default | Description |
-| --- | --- | --- | --- |
-| framework | str | None | None | Forces a specific adapter (for example: pyside6, pyqt6, kivy, tkinter, headless). |
-| custom_root | Path | None | None | Overrides project root used by settings and resource resolvers. |
-| enable_sentry | bool | True | Enables sentry hook only if sentry_dsn is available in loaded settings. |
-| argv | list[str] | None | None | Optional argv passed to framework app creation. |
+|---|---|---|---|
+| `framework` | `str \| None` | `None` | Forces a specific framework adapter. |
+| `custom_root` | `Path \| None` | `None` | Overrides the project root directory. |
+| `enable_sentry` | `bool` | `True` | Enables the Sentry hook when a DSN is available. |
+| `argv` | `list[str] \| None` | `None` | Optional arguments passed when creating the application. |
 
 Property reference:
 
 | Property | Type | Description |
-| --- | --- | --- |
-| container | EngineContainer | Underlying dependency container instance. |
-| app | Any | Native framework app instance (QApplication, Tk root, Kivy app, etc.). |
-| metadata | AppMetadata | App metadata object loaded from settings. |
-| app_settings | dict[str, Any] | Final merged settings dictionary. |
-| is_frozen | bool | True when running from a frozen bundle. |
-| platform | PlatformType | Detected platform enum. |
-| execution_mode | ExecutionMode | Source/frozen execution mode enum. |
-| window_title | str | Current window title, with getter/setter behavior. |
-| app_icon | str | None | Resolved app icon path, with setter support. |
+|---|---|---|
+| `container` | `EngineContainer` | The underlying dependency container instance. |
+| `app` | `Any` | The native framework application instance, such as `QApplication`, a Tk root, or a Kivy app. |
+| `metadata` | `AppMetadata` | Application metadata loaded from the settings. |
+| `app_settings` | `dict[str, Any]` | The final merged settings dictionary. |
+| `is_frozen` | `bool` | Indicates whether the application is running from a frozen bundle. |
+| `platform` | `PlatformType` | The detected platform enum value. |
+| `execution_mode` | `ExecutionMode` | The current execution mode: source or frozen. |
+| `window_title` | `str` | The current window title, with getter and setter support. |
+| `app_icon` | `str \| None` | The resolved application icon path, with setter support. |
 
 Method reference:
 
 | Method | Signature | Returns | Notes |
-| --- | --- | --- | --- |
-| get_default_window_title | `get_default_window_title()` | str | Uses metadata/app_name fallback chain. |
-| get_window_title | `get_window_title()` | str | Reads current title from native window when possible. |
-| set_window_title | `set_window_title(title, window=None)` | bool | Best-effort cross-toolkit title assignment. |
-| get_app_icon_path | `get_app_icon_path()` | str | None | Auto-discovers icon from settings and resource conventions. |
-| set_window_icon | `set_window_icon(icon_path_or_relative, window=None)` | bool | Accepts absolute path or relative resource path. |
-| get_resource | `get_resource(*segments, required=True)` | str | Resolves resource to absolute path string. |
-| run | `run()` | int | Starts event loop through active framework adapter. |
-| exec | `exec()` | int | Compatibility runner for Qt/Tk/Kivy event loop variants. |
-| exec_ | `exec_()` | int | Qt5 compatibility alias to exec(). |
+|---|---|---|---|
+| `get_default_window_title` | `get_default_window_title()` | `str` | Uses the metadata-to-`app_name` fallback chain. |
+| `get_window_title` | `get_window_title()` | `str` | Reads the current title from the native window when possible. |
+| `set_window_title` | `set_window_title(title, window=None)` | `bool` | Best-effort cross-toolkit title assignment. |
+| `get_app_icon_path` | `get_app_icon_path()` | `str \| None` | Automatically discovers the icon from settings and resource conventions. |
+| `set_window_icon` | `set_window_icon(icon_path_or_relative, window=None)` | `bool` | Accepts an absolute path or a relative resource path. |
+| `get_resource` | `get_resource(*segments, required=True)` | `str` | Resolves a resource to an absolute path string. |
+| `run` | `run()` | `int` | Starts the event loop through the active framework adapter. |
 
 ### Component (`qyro.ui.component`)
 
@@ -309,7 +366,7 @@ Components can receive properties (`props`) in two ways upon instantiation:
 Lifecycle hook order:
 
 1. `component_will_mount`
-2. `render` or `render_`
+2. `render`
 3. `component_did_mount`
 4. `set_styles`
 5. `on_resize`
@@ -317,33 +374,23 @@ Lifecycle hook order:
 Primary hooks:
 
 | Hook | Signature | Purpose |
-| --- | --- | --- |
-| component_will_mount | `component_will_mount()` | Pre-render initialization. |
-| render | `render()` | Build widgets/layouts. |
-| component_did_mount | `component_did_mount()` | Post-render setup. |
-| set_styles | `set_styles(path_or_styles=None)` | Apply styles/stylesheet from path or inline string. |
-| on_resize | `on_resize()` | Responsive behavior on mount and resize events. |
+|---|---|---|
+| `component_will_mount` | `component_will_mount()` | Performs initialization before rendering. |
+| `render` | `render()` | Builds the component's widgets and layouts. |
+| `component_did_mount` | `component_did_mount()` | Performs setup after rendering. |
+| `set_styles` | `set_styles(path_or_styles=None)` | Applies a stylesheet from a file path or an inline style definition. |
+| `on_resize` | `on_resize()` | Handles responsive behavior when the component is mounted or resized. |
 
-Compatibility aliases:
-
-* `render_`
-* `destroyComponent`
 
 Utility methods:
 
 | Method | Signature | Description |
 | --- | --- | --- |
-| calc | `calc(a, b)` | Returns percentage-based integer value. |
-| find | `find(target_type, name="")` | Delegates to native findChild when available. |
-| destroy_component | `destroy_component()` | Detach and schedule widget cleanup safely. |
-| get_resource | `get_resource(*segments, required=True)` | Top-level resource resolver shortcut. |
+| `calc` | `calc(a, b)` | Returns a percentage-based integer value. |
+| `find` | `find(target_type, name="")` | Delegates to the native `findChild` when available. |
+| `destroy_component` | `destroy_component()` | Detaches and schedules widget cleanup safely. |
+| `get_resource` | `get_resource(*segments, required=True)` | Top-level resource resolver shortcut. |
 
-## Notes on compatibility
-
-* The engine keeps several compatibility aliases from older code style:
-* PPGLifeCycle -> Component
-* app_is_frozen -> is_frozen helper
-* exec_() alias for Qt5 style calls
 
 
 * Automatic icon/title assignment is best-effort and depends on toolkit capabilities and available files.

@@ -508,21 +508,3 @@ class ApplicationContext:
         Can be overridden by user subclasses.
         """
         return self.container.framework_adapter.run()
-
-    def exec(self) -> int:
-        """Runs the framework application loop (Qt exec(), Tkinter mainloop(), or Kivy/adapter run())."""
-        if hasattr(self, "mainloop") and callable(getattr(self, "mainloop")):
-            getattr(self, "mainloop")()
-            return 0
-        if self._app and hasattr(self._app, "exec"):
-            return self._app.exec()
-        elif self._app and hasattr(self._app, "exec_"):
-            return self._app.exec_()
-        elif self._app and hasattr(self._app, "mainloop"):
-            self._app.mainloop()
-            return 0
-        return self.run()
-
-    def exec_(self) -> int:
-        """Qt backward-compatibility alias for exec()."""
-        return self.exec()

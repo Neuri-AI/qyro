@@ -40,7 +40,7 @@ class Component:
 
     1. Initialize the component and its underlying Qt widget.
     2. Call `component_will_mount()`.
-    3. Render the component through `render()` or `render_()`.
+    3. Render the component through `render()`.
     4. Call `component_did_mount()`.
     5. Apply component styles through `set_styles()`.
     6. Perform the initial responsive layout through `on_resize()`.
@@ -198,7 +198,7 @@ class Component:
 
         lifecycle = (
             ("component_will_mount",),
-            ("render", "render_"),
+            ("render",),
             ("component_did_mount",),
             ("set_styles",),
             ("on_resize",),
@@ -299,10 +299,6 @@ class Component:
 
         Subclasses should override this method to define their UI structure.
         """
-        pass
-
-    def render_(self) -> None:
-        """Backward-compatible alias for `render()`."""
         pass
 
     def component_did_mount(self) -> None:
@@ -433,10 +429,6 @@ class Component:
                 self.deleteLater()
             except Exception:
                 pass
-
-    def destroyComponent(self) -> None:
-        """Backward-compatible alias for `destroy_component()`."""
-        self.destroy_component()
 
     def find(
         self,
