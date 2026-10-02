@@ -63,31 +63,40 @@ Adapter selection behavior:
 
 ## Compatibility
 
-A check mark indicates that the complete workflow has been validated for
-the specified framework, platform, and Python version.
+A check mark indicates that the complete Qyro workflow has been validated
+for the specified framework, platform, and Python version:
 
 `init → start → build → bundle`
 
-| Framework | Platform | Python 3.10 | Python 3.11 | Python 3.12 | Python 3.13 | Python 3.14 |
-|---|---|---:|---:|---:|---:|---:|
-| PySide6 | Windows | — | — | — | — | — |
-| PySide6 | macOS | — | — | — | — | — |
-| PySide6 | Linux | — | — | — | — | — |
-| PyQt6 | Windows | — | — | — | — | — |
-| PyQt6 | macOS | — | — | — | — | — |
-| PyQt6 | Linux | — | — | — | — | — |
-| PyQt5 | Windows | — | — | — | — | — |
-| PyQt5 | macOS | — | — | — | — | — |
-| PyQt5 | Linux | — | — | — | — | — |
-| Kivy | Windows | — | — | — | — | — |
-| Kivy | macOS | — | — | — | — | — |
-| Kivy | Linux | — | — | — | — | — |
-| Tkinter | Windows | — | — | — | — | — |
-| Tkinter | macOS | — | — | — | — | — |
-| Tkinter | Linux | — | — | — | — | — |
+| Framework | Platform | Python 3.10 | Python 3.11 | Python 3.12 | Python 3.13 | Python 3.14 | Fail Step
+| --------- | -------- | ----------- | ----------- | ----------- | ----------- | ----------- | ----------- |
+| PySide6   | Windows  | ✅           | ✅           | ✅           | ✅           | ✅           |
+| PySide6   | macOS    | —           | —           | —           | —           | —           |
+| PySide6   | Linux    | —           | —           | —           | —           | —           |
+| PyQt6     | Windows  | ✅           | ✅           | ✅           | ✅           | ✅           |
+| PyQt6     | macOS    | —           | —           | —           | —           | —           |
+| PyQt6     | Linux    | —           | —           | —           | —           | —           |
+| PyQt5     | Windows  | ✅           | ✅           | ✅           | ✅           | ✅           |
+| PyQt5     | macOS    | —           | —           | —           | —           | —           |
+| PyQt5     | Linux    | —           | —           | —           | —           | —           |
+| Kivy      | Windows  | ✅           | ✅           | ✅           | ✅           | ❌           | `install`
+| Kivy      | macOS    | —           | —           | —           | —           | —           |
+| Kivy      | Linux    | —           | —           | —           | —           | —           |
+| Tkinter   | Windows  | ✅           | ✅           | ✅           | ✅           | ✅           |
+| Tkinter   | macOS    | —           | —           | —           | —           | —           |
+| Tkinter   | Linux    | —           | —           | —           | —           | —           |
 
-> Other combinations may work but have not yet been validated through the
-> complete workflow.
+> `—` indicates that the combination has not yet been validated.
+>
+> `❌` indicates that validation was attempted but failed. The `Step` shown
+> below identifies the stage where the failure occurred.
+>
+> **Kivy · Python 3.14 · Windows:** ❌ `install`
+>
+> Compatib**ility results are spec**ific to the host platform and environment
+> used during testing.
+>
+> **Test environment:** Windows 11 (`10.0.26200.9457`), Python 3.10.22.
 
 ## Installation
 
