@@ -1,7 +1,6 @@
 .vscode/
+.pytest_cache/
 __pycache__/
-test/
-tests/
 requirements/
 /build/
 /dist/
