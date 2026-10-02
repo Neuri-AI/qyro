@@ -69,7 +69,7 @@ The table below reports validation results for the complete desktop workflow:
 init → start → build → bundle
 ```
 
-> Matrix last validated: **2026-10-02**  
+> Table last validated: **2026-10-02**  
 > CI run: [#37052349565](https://github.com/Neuri-AI/qyro-cli/actions/runs/37052349565)
 
 | Framework | Platform | Python 3.10 | Python 3.11 | Python 3.12 | Python 3.13 | Python 3.14 | Notes |
