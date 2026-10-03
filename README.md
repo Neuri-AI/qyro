@@ -7,7 +7,7 @@
 > Desktop workflows are the current focus. Mobile support is not yet considered stable.
 
 
-# ⚡ Qyro Runtime
+# Qyro Runtime
 
 > **Runtime engine for Python applications, providing a cross-platform foundation for desktop and mobile environments.**
 
