@@ -10,15 +10,17 @@ from __future__ import annotations
 
 import hashlib
 import hmac
-import importlib.util
 import io
 import tempfile
 import zipfile
-from importlib.machinery import ExtensionFileLoader
 from pathlib import Path
 from threading import Lock
 
 from qyro.application.ports.environment import IEnvironmentPort
+from qyro.adapters.resources.runtime_secret import (
+    find_runtime_secret_module,
+    read_runtime_secret,
+)
 
 
 _MAGIC = b"QYRPKG"
@@ -27,6 +29,7 @@ _SALT_LEN = 16
 _TAG_LEN = 32
 _KEY_LEN = 32
 _RUNTIME_SECRET_MODULE_STEM = "runtime"
+_SECRETS_ARCHIVE_PATH = ".qyro/secrets.enc"
 
 
 class ProtectedResourceBundle:
@@ -34,6 +37,7 @@ class ProtectedResourceBundle:
 
     _lock = Lock()
     _extracted_cache: dict[str, Path] = {}
+    _encrypted_secrets_cache: dict[str, bytes | None] = {}
 
     @classmethod
     def get_extracted_root(cls, env_port: IEnvironmentPort) -> Path | None:
@@ -51,23 +55,40 @@ class ProtectedResourceBundle:
             if cached and cached.exists():
                 return cached
             try:
-                extracted_root = cls._extract_bundle(package_path, secret_module_path)
+                extracted_root, encrypted_payload = cls._extract_bundle(package_path, secret_module_path)
             except Exception:
                 return None
             cls._extracted_cache[cache_key] = extracted_root
+            cls._encrypted_secrets_cache[cache_key] = encrypted_payload
             return extracted_root
+
+    @classmethod
+    def get_encrypted_secrets_payload(cls, env_port: IEnvironmentPort) -> bytes | None:
+        """Return encrypted secrets payload embedded in protected_resources.pak when available."""
+        base_dir = env_port.get_bundle_dir() if env_port.is_frozen() else env_port.get_root_dir()
+        package_path = base_dir / ".qyro" / "protected_resources.pak"
+        secret_module_path = cls._find_runtime_secret_module(base_dir / ".qyro")
+
+        if not package_path.exists() or secret_module_path is None:
+            return None
+
+        cache_key = cls._cache_key(package_path, secret_module_path)
+        with cls._lock:
+            if cache_key in cls._encrypted_secrets_cache:
+                return cls._encrypted_secrets_cache[cache_key]
+
+            try:
+                extracted_root, encrypted_payload = cls._extract_bundle(package_path, secret_module_path)
+            except Exception:
+                return None
+
+            cls._extracted_cache[cache_key] = extracted_root
+            cls._encrypted_secrets_cache[cache_key] = encrypted_payload
+            return encrypted_payload
 
     @staticmethod
     def _find_runtime_secret_module(qyro_dir: Path) -> Path | None:
-        candidates = [
-            *sorted(qyro_dir.glob(f"{_RUNTIME_SECRET_MODULE_STEM}*.so")),
-            *sorted(qyro_dir.glob(f"{_RUNTIME_SECRET_MODULE_STEM}*.pyd")),
-            *sorted(qyro_dir.glob(f"{_RUNTIME_SECRET_MODULE_STEM}*.dylib")),
-        ]
-        for candidate in candidates:
-            if candidate.is_file():
-                return candidate
-        return None
+        return find_runtime_secret_module(qyro_dir)
 
     @staticmethod
     def _cache_key(package_path: Path, secret_module_path: Path) -> str:
@@ -79,7 +100,33 @@ class ProtectedResourceBundle:
         )
 
     @classmethod
-    def _extract_bundle(cls, package_path: Path, secret_module_path: Path) -> Path:
+    def _extract_bundle(cls, package_path: Path, secret_module_path: Path) -> tuple[Path, bytes | None]:
+        zip_bytes = cls._decrypt_package_to_zip_bytes(package_path, secret_module_path)
+        digest = hashlib.sha256(package_path.read_bytes()).hexdigest()[:16]
+        extract_root = Path(tempfile.gettempdir()) / f"qyro_protected_{digest}"
+        encrypted_secrets_payload = cls._read_embedded_secrets_payload(zip_bytes)
+
+        marker = extract_root / ".ok"
+        if marker.exists():
+            return extract_root, encrypted_secrets_payload
+
+        extract_root.mkdir(parents=True, exist_ok=True)
+        with zipfile.ZipFile(io.BytesIO(zip_bytes), "r") as archive:
+            for member in archive.infolist():
+                normalized_name = member.filename.strip("/")
+                if not normalized_name:
+                    continue
+                if normalized_name == _SECRETS_ARCHIVE_PATH:
+                    continue
+                if normalized_name.startswith(".qyro/"):
+                    continue
+                archive.extract(member, extract_root)
+
+        marker.write_text("ok", encoding="utf-8")
+        return extract_root, encrypted_secrets_payload
+
+    @classmethod
+    def _decrypt_package_to_zip_bytes(cls, package_path: Path, secret_module_path: Path) -> bytes:
         payload = package_path.read_bytes()
         runtime_secret = cls._read_runtime_secret(secret_module_path)
         key, ciphertext, nonce, tag = cls._parse_payload(payload, runtime_secret)
@@ -88,20 +135,15 @@ class ProtectedResourceBundle:
         if not hmac.compare_digest(tag, expected_tag):
             raise ValueError("Protected resources signature mismatch")
 
-        zip_bytes = cls._xor_keystream(ciphertext, key=key, nonce=nonce)
-        digest = hashlib.sha256(payload).hexdigest()[:16]
-        extract_root = Path(tempfile.gettempdir()) / f"qyro_protected_{digest}"
+        return cls._xor_keystream(ciphertext, key=key, nonce=nonce)
 
-        marker = extract_root / ".ok"
-        if marker.exists():
-            return extract_root
-
-        extract_root.mkdir(parents=True, exist_ok=True)
+    @staticmethod
+    def _read_embedded_secrets_payload(zip_bytes: bytes) -> bytes | None:
         with zipfile.ZipFile(io.BytesIO(zip_bytes), "r") as archive:
-            archive.extractall(extract_root)
-
-        marker.write_text("ok", encoding="utf-8")
-        return extract_root
+            try:
+                return archive.read(_SECRETS_ARCHIVE_PATH)
+            except KeyError:
+                return None
 
     @classmethod
     def _parse_payload(cls, payload: bytes, runtime_secret: bytes) -> tuple[bytes, bytes, bytes, bytes]:
@@ -149,27 +191,7 @@ class ProtectedResourceBundle:
 
     @staticmethod
     def _read_runtime_secret(secret_module_path: Path) -> bytes:
-        module_name = _RUNTIME_SECRET_MODULE_STEM
-        loader = ExtensionFileLoader(module_name, str(secret_module_path))
-        spec = importlib.util.spec_from_file_location(module_name, str(secret_module_path), loader=loader)
-        if spec is None:
-            raise ValueError("Unable to load runtime secret module spec")
-        module = importlib.util.module_from_spec(spec)
-        loader.exec_module(module)
-
-        value = getattr(module, "RUNTIME_SECRET_HEX", None)
-        if not isinstance(value, str) or not value.strip():
-            raise ValueError("Runtime secret not found in runtime module")
-
-        try:
-            secret = bytes.fromhex(value.strip())
-        except ValueError as exc:
-            raise ValueError("Invalid runtime secret hex format") from exc
-
-        if len(secret) < 16:
-            raise ValueError("Runtime secret is too short")
-
-        return secret
+        return read_runtime_secret(secret_module_path)
 
     @staticmethod
     def _xor_keystream(data: bytes, *, key: bytes, nonce: bytes) -> bytes:

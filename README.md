@@ -35,6 +35,7 @@ Qyro currently provides:
 - Automatic settings loading from JSON files.
 - Resource resolution that works in source mode and frozen mode.
 - A component lifecycle mixin for UI classes with flexible property handling.
+- Runtime loading of encrypted secrets payloads (AES-256-GCM + HKDF-SHA256) embedded inside `protected_resources.pak` when present.
 
 ## What it is not
 
@@ -164,6 +165,18 @@ my-app/
    └─ linux/
 
 ```
+
+For protected builds, Qyro can also load a generated encrypted secrets payload:
+
+```text
+my-app/
+└─ .qyro/
+    ├─ protected_resources.pak
+    ├─ runtime*.so|runtime*.pyd
+
+```
+
+Encryption of `secrets.json` protects embedded secrets at rest, but it does not provide absolute protection against an attacker who can execute, debug, or reverse engineer the application.
 
 ## Qyro Settings Builder
 
