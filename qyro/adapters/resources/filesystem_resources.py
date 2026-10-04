@@ -7,6 +7,7 @@ from pathlib import Path
 
 from qyro.application.ports.environment import IEnvironmentPort
 from qyro.application.ports.resources import IResourcePort
+from qyro.adapters.resources.protected_bundle import ProtectedResourceBundle
 from qyro.domain.entities import PlatformType, ResourceQuery, ResourceResult
 
 
@@ -36,6 +37,17 @@ class FileSystemResourceAdapter(IResourcePort):
         os_dirs = platform_subdir_map.get(platform, [])
 
         candidates: list[Path] = []
+
+        protected_root = ProtectedResourceBundle.get_extracted_root(self._env)
+        if protected_root:
+            protected_resources = protected_root / "resources"
+            if protected_resources.exists():
+                for os_sub in os_dirs:
+                    candidates.append(protected_resources / os_sub)
+                candidates.extend([
+                    protected_resources / "base",
+                    protected_resources,
+                ])
 
         if self._env.is_frozen():
             bundle = self._env.get_bundle_dir()

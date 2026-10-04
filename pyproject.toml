@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "qyro-engine"
-version = "1.0.0a1"
+version = "1.0.0a2"
 description = "Qyro Engine is the runtime engine for the Qyro ecosystem, providing the foundation for building and running Python applications across desktop and mobile platforms."
 authors = ["Qyro Team"]
 license = "MIT"

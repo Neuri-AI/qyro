@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, Dict
 from qyro.application.ports.environment import IEnvironmentPort
 from qyro.application.ports.settings import ISettingsPort
+from qyro.adapters.resources.protected_bundle import ProtectedResourceBundle
 from qyro.domain.entities import AppMetadata, PlatformType
 
 
@@ -22,6 +23,12 @@ class JsonSettingsAdapter(ISettingsPort):
     def _find_settings_dir(self) -> Path | None:
         if self._custom_settings_dir and self._custom_settings_dir.exists():
             return self._custom_settings_dir
+
+        protected_root = ProtectedResourceBundle.get_extracted_root(self._env)
+        if protected_root:
+            protected_settings = protected_root / "settings"
+            if protected_settings.exists() and (protected_settings / "base.json").exists():
+                return protected_settings
 
         root = self._env.get_bundle_dir() if self._env.is_frozen() else self._env.get_root_dir()
 
