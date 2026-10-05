@@ -1,122 +1,106 @@
 ---
 title: "ApplicationContext"
-description: "Inicialización global, estado del runtime, recursos, título, icono y event loop."
+description: "Contexto, arranque, metadatos y aplicación nativa."
 ---
 
 # ApplicationContext
 
-`ApplicationContext` es la fachada principal del runtime. Puede instanciarse directamente o mezclarse con una ventana nativa.
+Una aplicación necesita configuración, recursos y una instancia del framework antes de iniciar su bucle de eventos. `ApplicationContext` es la fachada que reúne estas responsabilidades. Puedes usarlo por composición junto a widgets nativos, como en el [inicio rápido](/es/quickstart), o como mixin en una ventana.
+
+## Crear un contexto
 
 ```python
-ApplicationContext(
-    framework: str | None = None,
-    custom_root: Path | None = None,
-    enable_sentry: bool = True,
-    argv: list[str] | None = None,
-    *args,
-    **kwargs,
+from pathlib import Path
+from qyro import ApplicationContext
+
+context = ApplicationContext(
+    framework="headless",
+    custom_root=Path.cwd().resolve(),
+    enable_sentry=False,
+    argv=[],
 )
+print(context.metadata.app_name)
+print(context.platform.value, context.execution_mode.value)
 ```
 
-## Parámetros
-
-| Parámetro | Predeterminado | Función |
+| Parámetro | Default | Significado |
 | --- | --- | --- |
-| `framework` | `None` | Fuerza `pyside6`, `pyqt6`, `pyside2`, `pyqt5`, `kivy`, `tkinter` o `headless`. |
-| `custom_root` | `None` | Evita el descubrimiento automático y usa esa raíz. Útil en tests y hosts embebidos. |
-| `enable_sentry` | `True` | Permite Sentry si la configuración contiene `sentry_dsn`. |
-| `argv` | `None` | Argumentos para crear la aplicación nativa. Qt usa `sys.argv` si es `None`. |
-| `*args`, `**kwargs` | — | Se pasan cooperativamente al siguiente `__init__` del MRO. |
+| `framework` | `None` | Nombre del adaptador; sin valor usa settings y después autodetección |
+| `custom_root` | `None` | `Path` que sustituye la raíz; utiliza un path absoluto |
+| `enable_sentry` | `True` | Permite seleccionar Sentry si settings contiene un DSN |
+| `argv` | `None` | Argumentos para crear la aplicación nativa; Qt usa `sys.argv` cuando no se indican |
+| `*args`, `**kwargs` | — | Reenvío cooperativo al constructor siguiente en la herencia |
 
-## Un único motor global
+## El arranque
 
-`ApplicationContext` mantiene `_global_container` y `_global_boot_info` a nivel de clase. La primera instancia crea el motor; las siguientes reutilizan exactamente el mismo contenedor y aplicación nativa.
-
-<Warning>La primera inicialización gana. Si primero creas `ApplicationContext(framework="headless")`, otra instancia posterior con `framework="pyside6"` no reemplazará el adaptador. Elige framework, raíz, argumentos y Sentry antes de crear cualquier contexto o de llamar a helpers globales.</Warning>
-
-Los helpers `qyro.get_resource()`, `qyro.load_build_settings()` y `qyro.is_frozen()` reutilizan el contenedor de `ApplicationContext` cuando ya existe. Si se invocan primero, crean un contenedor procedural con autodetección.
-
-## Inicialización con herencia múltiple
-
-Al definir una subclase, Qyro envuelve su constructor mediante `__init_subclass__`:
-
-1. Adjunta el contexto y crea la aplicación nativa antes del constructor del widget.
-2. Ejecuta el `__init__` original.
-3. Aplica título e icono después de que el objeto C++/toolkit esté listo.
-
-```python
-class Window(QMainWindow, ApplicationContext):
-    def __init__(self):
-        super().__init__()
-        # self.container y QApplication ya existen aquí.
+```mermaid
+sequenceDiagram
+    participant client as Código de aplicación
+    participant context as ApplicationContext
+    participant container as EngineContainer
+    participant settings as Adaptador de settings
+    participant framework as Adaptador UI
+    client->>context: Primera creación
+    context->>container: Construir adaptadores y casos de uso
+    container->>settings: Leer configuración cacheada
+    container->>framework: Seleccionar y comprobar disponibilidad
+    context->>container: Ejecutar InitializeEngineUseCase
+    container->>container: Instalar telemetría
+    container->>settings: Crear AppMetadata
+    container->>framework: Crear o recuperar aplicación nativa
+    container-->>context: Boot info
+    context-->>client: Contexto listo
 ```
 
-La implementación incluye defensas específicas contra acceso prematuro a objetos SIP de PyQt.
+El **boot info** es el resultado de arranque: instancia nativa, metadatos, plataforma, modo y condición frozen. Construir `EngineContainer` por sí solo carga settings y selecciona framework, pero no ejecuta ese caso de uso ni inicia un bucle de eventos.
+
+## Estado global y primera inicialización
+
+En el uso habitual, el primer contexto fija el contenedor compartido y sus opciones. Una instancia posterior con otro `framework` o raíz no sustituye el motor. Elige esas opciones antes de construir ventanas y evita efectos secundarios de arranque al importar módulos.
+
+Los helpers `qyro.get_resource`, `load_build_settings` e `is_frozen` usan el contenedor del contexto cuando existe. Si se llaman primero crean un contenedor procedural independiente, sin ejecutar la inicialización del framework; un contexto posterior puede reemplazar ese contenedor procedural. No interpretes un helper como una garantía de arranque completo.
+
+La implementación utiliza atributos de clase y tiene rutas de inicialización por subclases y mixins. No está diseñada para gestionar varias aplicaciones/toolkits aislados en un proceso. No hay reset público; los tests restablecen atributos privados. Para tests de frameworks diferentes utiliza procesos separados.
 
 ## Propiedades
 
-| Propiedad | Tipo | Contenido |
-| --- | --- | --- |
-| `container` | `EngineContainer` | Adaptadores y casos de uso conectados. |
-| `app` | `Any` | `QApplication`, root Tk, Kivy `App`, `HeadlessApplication` o `None` según el toolkit. |
-| `metadata` | `AppMetadata` | Metadatos tipados y `raw_settings`. |
-| `app_settings` | `dict[str, Any]` | Configuración final combinada. |
-| `platform` | `PlatformType` | `windows`, `macos`, `linux`, `android`, `ios` o `unknown`. |
-| `execution_mode` | `ExecutionMode` | `source`, `pyinstaller`, `frozen_generic` o `embedded`. |
-| `is_frozen` | `bool` | `True` cuando `sys.frozen` es truthy. |
-| `window_title` | `str` | Lectura/escritura del título con fallback. |
-| `app_icon` | `str | None` | Ruta del icono detectado o asignado. |
+| Propiedad | Resultado |
+| --- | --- |
+| `container` | `EngineContainer`, con adaptadores y casos de uso |
+| `app` | Instancia nativa o `None`, según el momento y toolkit |
+| `metadata` | `AppMetadata` |
+| `app_settings` | Diccionario final de settings, por referencia |
+| `platform` | `PlatformType` detectado |
+| `execution_mode` | `ExecutionMode` detectado |
+| `is_frozen` | Valor del arranque que normalmente es booleano |
+| `window_title` | Título del contexto, con getter/setter |
+| `app_icon` | Ruta del icono o `None`, con getter/setter |
 
-`ExecutionMode.EMBEDDED` existe en el dominio, aunque el adaptador actual no lo produce automáticamente.
+Modificar `app_settings` cambia memoria compartida: no persiste un JSON ni reconstruye automáticamente los campos de `metadata`. Usa configuración de arranque y estado mutable de aplicación como conceptos separados.
 
-## Título
-
-`get_default_window_title()` toma `metadata.app_name`; si falta, intenta `raw_settings["app_name"]` y finalmente `"Qyro Application"`.
+## Título e icono
 
 ```python
-window.window_title = "Panel de control"
-print(window.get_window_title())
-
-ok = window.set_window_title("Secundaria", window=other_window)
+context.set_window_title(context.get_default_window_title(), window=window)
+context.set_window_icon("icons/app.png", window=window)
 ```
 
-La asignación es best-effort: prueba el adaptador, `setWindowTitle()`, `title()` o el atributo `title`. El booleano indica si alguna estrategia funcionó.
+Este fragmento presupone una ventana nativa ya creada. Por composición, especifica `window`; la propiedad `context.window_title` por sí sola actúa sobre el contexto, no descubre tu ventana.
 
-## Icono
+El título por defecto sale de `metadata.app_name`, después del valor raw y finalmente `Qyro Application`. En modo mixin intenta conservar un título explícito del widget tras el constructor. `get_window_title()` puede devolver el último título cacheado aunque después lo cambies por la API nativa; usa un mecanismo coherente.
 
-Una clave explícita `icon` o `app_icon` tiene prioridad:
+El icono explícito usa `icon` o `app_icon` como nombre de recurso. Sin valor, prueba candidatos por plataforma y fallbacks (`icons/Icon.ico`, PNG con tamaños, `app.icns`, etc.). No todos los nombres son equivalentes ni todos los formatos funcionan en cada toolkit. `set_window_icon` acepta un path existente o un recurso relativo; devuelve falso al no resolverlo, pero verdadero con una ruta válida aunque el toolkit no lo muestre.
 
-```json
-{"icon": "icons/app.ico"}
-```
+## Herencia múltiple
 
-Sin clave, Qyro prueba nombres convencionales. Windows prioriza `.ico`; macOS prueba PNG de 512, 256, 128 y 1024 px antes de `.icns`; Linux prueba PNG de varios tamaños. Después usa una lista común de fallback.
+En Qt, una ventana puede combinar `QMainWindow`, `Component` y `ApplicationContext`. El wrapper del contexto prepara la aplicación nativa antes del constructor del widget; al finalizar intenta aplicar título e icono. Consulta el [ejemplo PySide6](/es/frameworks/pyside6).
 
-```python
-path = window.get_app_icon_path()
-window.app_icon = "icons/alternate.png"
-window.set_window_icon("/ruta/absoluta/icon.ico", window=dialog)
-```
+Los wrappers también pueden inicializar sin opciones explícitas antes de que tu constructor las procese. Para elegir framework/raíz de forma determinista, crea primero un contexto separado con esas opciones y luego la ventana. Evita pasar `framework=` como keyword a un `Component`: lo interpretaría como prop.
 
-`set_window_icon()` devuelve `False` si no pudo resolver la ruta. Cuando existe, guarda la ruta y retorna truthy incluso si el toolkit no pudo aplicarla; el método representa principalmente una resolución válida y un intento de aplicación.
+## Ejecutar y terminar
 
-## Recursos y event loop
+`context.run()` delega al adaptador. Qt devuelve el código de `exec`/`exec_`; Tkinter, Kivy y headless devuelven `0`. En Kivy, una subclase nativa `App` debe ejecutar su propio `run`; el adaptador sin un `App` existente puede crear una aplicación genérica sin tu UI.
 
-```python
-stylesheet = window.get_resource("styles", "dark.qss")
-optional = window.get_resource("images", "seasonal.png", required=False)
-exit_code = window.run()
-```
+Para terminar por el adaptador utiliza `context.container.framework_adapter.exit(code=0)`. No existe `context.exit()` ni un lifecycle de cierre automático de recursos Python. Qt sale del loop, Tkinter destruye su root y Kivy detiene la app que el adaptador conoce. Libera conexiones y suscripciones según el toolkit.
 
-`run()` delega completamente en el adaptador activo. Los adaptadores Qt devuelven el código real del event loop; Kivy, Tkinter y headless devuelven `0`.
-
-## Reiniciar estado en tests
-
-No existe una API pública de reset. La suite aislada del proyecto restablece los dos atributos de clase entre pruebas:
-
-```python
-ApplicationContext._global_container = None
-ApplicationContext._global_boot_info = None
-```
-
-Trátalo como técnica de test interna, no como operación de producción.
+Las rutas y diferencias de arranque están en [Source/frozen](/es/source-frozen); los errores globales, en [Telemetría](/es/telemetry).

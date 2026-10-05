@@ -7,6 +7,8 @@ description: "Referencia completa de símbolos públicos, dominio, puertos, caso
 
 Esta página separa la API pública de alto nivel de las APIs avanzadas/internas. Los imports desde `qyro` son la superficie más estable.
 
+Los bloques de firmas son notación: las anotaciones en una lista de parámetros no son llamadas copiables. Para programas ejecutables ve a [Inicio rápido](/es/quickstart), [Frameworks](/es/frameworks) y [Aplicaciones completas](/es/examples). El proyecto está en alpha.
+
 ## Paquete `qyro`
 
 ```python
@@ -58,11 +60,11 @@ Constructor y comportamiento completo: [guía de ApplicationContext](/es/applica
 | `platform` | `PlatformType` |
 | `execution_mode` | `ExecutionMode` |
 | `window_title` | propiedad `str` con setter |
-| `app_icon` | propiedad `str | None` con setter |
+| `app_icon` | propiedad `str \| None` con setter |
 | `get_default_window_title()` | `str` |
 | `get_window_title()` | `str` |
 | `set_window_title(title, window=None)` | `bool` |
-| `get_app_icon_path()` | `str | None` |
+| `get_app_icon_path()` | `str \| None` |
 | `set_window_icon(path, window=None)` | `bool` |
 | `get_resource(*segments, required=True)` | `str` |
 | `run()` | `int` |
@@ -89,7 +91,7 @@ Puede usarse como mixin o decorador. Consulta [Componentes](/es/components).
 
 ## `EngineContainer`
 
-```python
+```text
 EngineContainer(
     framework_name: str | None = None,
     custom_root: Path | None = None,
@@ -110,6 +112,8 @@ Atributos construidos:
 - `load_settings_use_case`
 - `initialize_engine_use_case`
 
+El constructor carga settings y selecciona el adaptador, pero no ejecuta automáticamente el caso de uso de arranque. No hay método `container.run()`.
+
 ## Entidades de dominio
 
 ### `PlatformType`
@@ -126,6 +130,8 @@ Enum de cadena: `WINDOWS="windows"`, `MACOS="macos"`, `LINUX="linux"`, `ANDROID=
 - `FROZEN_GENERIC="frozen_generic"`
 - `EMBEDDED="embedded"`
 
+El detector no devuelve `EMBEDDED` ni tiene una rama para iOS. Un enum no equivale a soporte móvil completo.
+
 ### `ResourceQuery`
 
 Dataclass frozen con `relative_path_segments: tuple[str, ...]`.
@@ -137,7 +143,7 @@ Dataclass frozen con `relative_path_segments: tuple[str, ...]`.
 
 Dataclass frozen:
 
-```python
+```text
 ResourceResult(
     absolute_path: Path,
     exists: bool,
@@ -148,7 +154,7 @@ ResourceResult(
 
 ### `AppMetadata`
 
-```python
+```text
 AppMetadata(
     app_name: str,
     version: str = "0.1.0",
@@ -163,6 +169,8 @@ AppMetadata(
 - `default()`: retorna `QyroApp`, versión `1.0.0`, autor `Author`, id `com.qyro.app`.
 
 Los defaults de la dataclass, `default()` y `JsonSettingsAdapter.load_metadata()` no son idénticos; normalmente usa el objeto entregado por el contexto.
+
+`raw_settings` utiliza `field(default_factory=dict)`: cada instancia directa obtiene un diccionario propio; `{}` en la firma es notación, no un default mutable compartido.
 
 ## Errores
 
@@ -196,6 +204,8 @@ Los defaults de la dataclass, `default()` y `JsonSettingsAdapter.load_metadata()
 
 - `execute(force_reload=False) -> AppMetadata`
 - `get_setting(key, default=None) -> Any`
+
+`force_reload=True` reconstruye metadatos sin invalidar la caché JSON del adaptador. Consulta [Settings](/es/settings).
 
 ### `InitializeEngineUseCase(env_port, settings_port, framework_port, telemetry_port=None)`
 
@@ -234,8 +244,10 @@ Los defaults de la dataclass, `default()` y `JsonSettingsAdapter.load_metadata()
 - `ProtectedResourceBundle.get_extracted_root(env_port)`
 - `ProtectedResourceBundle.get_encrypted_secrets_payload(env_port)`
 - `find_runtime_secret_module(qyro_dir)` / `read_runtime_secret(path)`
-- `derive_aes256_key(secret, salt)`
-- `encrypt_secrets_payload(plaintext, secret, salt=None, nonce=None)`
-- `decrypt_secrets_payload(payload, secret)`
+- `derive_aes256_key(runtime_secret, salt)`
+- `encrypt_secrets_payload(plaintext, runtime_secret, *, salt=None, nonce=None)`
+- `decrypt_secrets_payload(payload, runtime_secret)`
 
 Estos símbolos no se reexportan desde `qyro` y pueden cambiar con mayor libertad.
+
+En `encrypt_secrets_payload`, `salt` y `nonce` son exclusivamente keyword. `component_will_unmount`, `context.exit`, `set_state` y `dispatch` no son métodos del core de Qyro. Pydux proporciona sus propias APIs opcionales de estado y limpieza.

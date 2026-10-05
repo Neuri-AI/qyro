@@ -15,34 +15,69 @@
         "language": "es",
         "groups": [
           {
-            "group": "Primeros pasos",
+            "group": "Fundamentos de Qyro",
             "pages": [
-              "es/index",
-              "es/installation",
-              "es/quickstart",
-              "es/project-structure"
+              "es/index"
             ]
           },
           {
-            "group": "Guías del runtime",
+            "group": "Qyro CLI",
             "pages": [
+              "es/cli",
+              "es/installation",
+              "es/quickstart",
+              "es/project-structure",
+              "es/tooling"
+            ]
+          },
+          {
+            "group": "Qyro Engine",
+            "pages": [
+              "es/engine",
               "es/application-context",
               "es/components",
               "es/settings",
               "es/resources",
+              "es/source-frozen",
               "es/frameworks",
-              "es/telemetry",
-              "es/protected-resources"
+              {
+                "group": "Frameworks",
+                "pages": [
+                  "es/frameworks/pyside6",
+                  "es/frameworks/pyqt6",
+                  "es/frameworks/pyqt5",
+                  "es/frameworks/pyside2",
+                  "es/frameworks/tkinter",
+                  "es/frameworks/kivy"
+                ]
+              },
+              "es/secrets",
+              "es/protected-resources",
+              "es/telemetry"
             ]
           },
           {
-            "group": "Arquitectura y referencia",
+            "group": "Pydux: integración opcional",
+            "pages": [
+              "es/pydux"
+            ]
+          },
+          {
+            "group": "Demos",
+            "pages": [
+              "es/examples"
+            ]
+          },
+          {
+            "group": "Consulta y mantenimiento",
             "pages": [
               "es/architecture",
-              "es/codebase-map",
               "es/api-reference",
+              "es/compatibility",
               "es/troubleshooting",
-              "es/development"
+              "es/codebase-map",
+              "es/development",
+              "es/audit-report"
             ]
           }
         ]

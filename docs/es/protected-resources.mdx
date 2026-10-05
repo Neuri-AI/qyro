@@ -45,7 +45,7 @@ QYRPKG | salt(16) | wrapped_key(32) | nonce(16) | HMAC-SHA256(32) | ciphertext
 
 Este esquema es un formato interno específico de Qyro. Para secretos se usa un esquema estándar distinto.
 
-## Extracción segura desde la perspectiva del runtime
+## Extracción y caché
 
 La carpeta es:
 
@@ -54,6 +54,8 @@ La carpeta es:
 ```
 
 Un archivo `.ok` marca una extracción completa y permite reutilizarla. El proceso mantiene cachés de clase protegidas por `threading.Lock`.
+
+No hay limpieza automática al salir ni validación nueva del contenido extraído cuando existe `.ok`. El lock es del proceso, no entre varios procesos. Settings y resources extraídos quedan legibles: esa carpeta no es un almacén seguro.
 
 Durante la extracción:
 
@@ -119,3 +121,42 @@ Compatibilidad legacy: si el bundle no contiene `.qyro/secrets.enc`, el runtime 
 - Para secretos de alto valor, prefiere un backend remoto o almacén del sistema operativo y obtén tokens cortos en runtime.
 - Considera comprometidos los secretos de un cliente si un atacante controla su proceso.
 - Regenera bundle y módulo juntos; la cache key depende de ambos.
+
+## Build, runtime y fallback
+
+```mermaid
+flowchart TD
+    artifacts[".pak y módulo runtime"] --> present{"¿Ambos disponibles?"}
+    present -->|"No"| fallback["Continuar sin raíz protegida"]
+    present -->|"Sí"| verify["Recuperar clave, autenticar y descifrar"]
+    verify --> valid{"¿Paquete y ZIP válidos?"}
+    valid -->|"No"| fallback
+    valid -->|"Sí"| split["Separar secrets.enc y archivos ordinarios"]
+    split --> memory["Payload de secretos en memoria"]
+    split --> temp["Settings y resources en directorio temporal"]
+    temp --> paths["Adapters consumen rutas"]
+    memory --> secrets["Descifrar AES-GCM y combinar settings"]
+```
+
+El loader abre el paquete completo y extrae el ZIP, no descifra solo el archivo solicitado. La caché evita repetir extracción. Fallos exteriores permiten fallback; fallos AES-GCM de un payload recibido son estrictos.
+
+En `build.json`, el CLI admite:
+
+```json
+{
+  "resource_protection": {
+    "enabled": true,
+    "settings_dir": "settings",
+    "resources_dir": "resources",
+    "bundle_path": ".qyro/protected_resources.pak"
+  }
+}
+```
+
+Empaqueta recursivamente esas carpetas bajo `settings/` y `resources/`, excluye el `secrets.json` source principal y añade la versión cifrada si existe. Genera secreto/clave por build, compila runtime mediante Cython y agrega ambos artefactos bajo `.qyro` en PyInstaller. El módulo runtime también se compila sin protección completa para empaquetar secretos.
+
+Mantén el basename `protected_resources.pak`: el runtime busca ese nombre fijo aunque el CLI acepte otro `bundle_path`. No hay una clasificación automática de datos sensibles; no incluyas otras copias de secretos en assets.
+
+Usa `qyro bundle --format dir --no-resources`, o tu formato con `--no-resources`, cuando los assets ya estén incluidos. De lo contrario copia resources originales legibles junto a la aplicación protegida.
+
+El XOR/keystream exterior es un formato propio, distinto de AES-GCM de secrets; no se presenta como criptografía auditada independientemente. El material para descifrar viaja con el cliente. Consulta [Secrets](/es/secrets) y [Tooling](/es/tooling). `clean` no elimina `.qyro` ni esta extracción temporal.

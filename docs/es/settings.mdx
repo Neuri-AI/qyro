@@ -5,7 +5,9 @@ description: "Descubrimiento, merge, metadatos, caché y secretos en JSON."
 
 # Configuración
 
-`JsonSettingsAdapter` carga configuración JSON jerárquica y produce tanto el diccionario final como `AppMetadata`.
+Los **settings** son valores de arranque: metadatos, toolkit y opciones propias. Qyro los lee, pero no transforma automáticamente cada clave en una propiedad visual. `JsonSettingsAdapter` combina JSON y produce el diccionario final y `AppMetadata`. No es persistencia de preferencias.
+
+El repositorio de settings del [CLI](/es/tooling) hace merge profundo y activa perfiles explícitos; sus reglas son diferentes de las descritas aquí.
 
 ## Archivos
 
@@ -36,7 +38,6 @@ secretos cifrados embebidos o legacy
 Ejemplo:
 
 ```json
-// base.json
 {
   "app_name": "Example",
   "window": {"width": 800, "height": 600},
@@ -45,14 +46,25 @@ Ejemplo:
 ```
 
 ```json
-// windows.json
 {
   "window": {"width": 1024},
   "debug": true
 }
 ```
 
-El resultado de `window` será `{"width": 1024}`: no conserva `height`, porque no hay merge profundo.
+El primer bloque se guarda en `base.json` y el segundo en `windows.json`, sin comentarios. El resultado de `window` será `{"width": 1024}`: no conserva `height`, porque no hay merge profundo. Repite el objeto completo para conservar todos sus campos.
+
+```mermaid
+flowchart TD
+    folder["Elegir carpeta de settings"] --> base["Leer base.json"]
+    base --> platform["Primer override de plataforma válido"]
+    platform --> plain["Secretos planos si existen"]
+    plain --> encrypted["Secretos cifrados si están disponibles"]
+    encrypted --> cache["Cachear diccionario"]
+    cache --> metadata["Crear AppMetadata"]
+```
+
+Cada override sustituye claves completas. Utiliza objetos JSON: los archivos ordinarios no tienen validación de schema, y `dict.update` puede aceptar estructuras inesperadas o aplicar datos parcialmente antes de una excepción.
 
 ## Búsqueda de la carpeta
 
@@ -66,7 +78,23 @@ En source, la primera carpeta con `base.json` gana:
 
 Si ninguna existe, se intenta el bundle protegido. En frozen, el bundle protegido se consulta antes que las rutas ordinarias del bundle.
 
-`custom_settings_dir` en `EngineContainer` reemplaza la búsqueda si el directorio existe. `ApplicationContext` no expone ese parámetro directamente.
+`custom_settings_dir` en `EngineContainer` sustituye la búsqueda si existe, incluso si no contiene `base.json`. `ApplicationContext` no expone ese parámetro.
+
+```mermaid
+flowchart TD
+    custom{"¿Directorio personalizado existente?"} -->|"Sí"| selected["Seleccionar esa carpeta"]
+    custom -->|"No"| mode{"¿Source?"}
+    mode -->|"Sí"| local{"¿Settings locales con base.json?"}
+    local -->|"Sí"| selected
+    local -->|"No"| protected{"¿Settings protegidos disponibles?"}
+    mode -->|"No"| protected
+    protected -->|"Sí"| selected
+    protected -->|"No"| ordinary{"¿Settings ordinarios con base.json?"}
+    ordinary -->|"Sí"| selected
+    ordinary -->|"No"| defaults["Diccionario vacío y metadatos por defecto"]
+```
+
+Las rutas usan root en source y bundle en frozen, con el orden listado. Solo se selecciona una carpeta; no se combinan los archivos base de diferentes raíces.
 
 ## Claves de metadatos
 
@@ -139,3 +167,13 @@ Consulta [Recursos protegidos](/es/protected-resources) para el formato criptogr
 - JSON base/plataforma/plano inválido: se ignora silenciosamente.
 - Payload cifrado corrupto, clave incorrecta o JSON descifrado inválido: se lanza error.
 - `sentry_dsn` sin `sentry-sdk`: el arranque continúa con un warning.
+
+## Configuración en memoria y tooling
+
+`context.app_settings` y `get_raw_settings()` entregan el diccionario cacheado por referencia. Modificarlo no escribe archivos ni reconstruye automáticamente los campos de metadata. Los snippets con `container` presuponen un `EngineContainer` creado.
+
+`load_metadata` usa los defaults de la tabla. `AppMetadata(app_name="Ejemplo")` usa los defaults del dataclass (`version="0.1.0"`, author/identifier vacíos); `AppMetadata.default()` usa `author="Author"`. No son formas idénticas.
+
+`entry_point`, `release.json`, `optimization`, `bundle`, `sign` y `resource_protection` son entradas del tooling cuando este las interpreta. El Engine no activa perfiles release/debug ni lee `build.json`; una clave `window` o `debug` no configura sola la UI. Tu aplicación lee y aplica sus opciones.
+
+Antes de utilizar credenciales, consulta [Secrets](/es/secrets), especialmente la mezcla de secretos de firma y cliente durante build.

@@ -7,6 +7,8 @@ description: "Inventario archivo por archivo del runtime, pruebas y automatizaci
 
 Esta página sirve como índice de mantenimiento del repositorio. Los archivos `__init__.py` reexportan símbolos de su paquete salvo que se indique lo contrario.
 
+Lee [Arquitectura](/es/architecture) antes del inventario. Un símbolo importable desde adapters no es automáticamente API estable; la superficie principal está en [Referencia](/es/api-reference).
+
 ## Raíz y automatización
 
 | Archivo | Responsabilidad |
@@ -92,3 +94,23 @@ Esta página sirve como índice de mantenimiento del repositorio. Los archivos `
 | `tests/test_secrets_crypto.py` | Roundtrip, headers, autenticación, aleatoriedad, plataformas y no logging. |
 
 Los directorios `build/`, caches y bytecode son artefactos generados, no parte de la API fuente.
+
+## Tooling y estado opcional
+
+Estas rutas pertenecen a otros repositorios, no al Engine:
+
+| Ruta desde cada repositorio | Responsabilidad |
+| --- | --- |
+| CLI: `qyro_cli/cmdline/commands` | Registro, comandos, argumentos y aliases |
+| CLI: `qyro_cli/application/use_cases` | Init, start, freeze, bundle, sign, clean y versiones |
+| CLI: `qyro_cli/adapters/templates` | GitHub, caché y fallback; el checkout no incluye las plantillas de fallback |
+| CLI: `qyro_cli/adapters/persistence/storage.py` | Settings del tooling, merge profundo y perfiles |
+| CLI: `qyro_cli/adapters/freeze` | Hooks, PyInstaller, Cython, cifrado y optimización |
+| CLI: `qyro_cli/adapters/package` | Layout release, formatos y firma/notarización |
+| Pydux: `pydux/core` | Store, Action, selectores y tipos |
+| Pydux: `pydux/toolkit` | Slices, configure_store y thunks |
+| Pydux: `pydux/adapters` | Bindings, bridges y hooks Qyro |
+| Pydux: `pydux/devtools` | Historial e inspector HTTP con assets |
+| Pydux: `docs`, `examples`, `tests` | Uso público previsto y evidencia de comportamiento |
+
+El [informe](/es/audit-report) registra contradicciones y validaciones de estos proyectos sin modificarlos.

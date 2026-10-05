@@ -48,6 +48,8 @@ Configura el DSN en settings:
 
 Y habilita el extra `sentry`. El adaptador llama:
 
+Este bloque describe la llamada interna; `dsn` y `version` son valores de configuración, no variables definidas por el fragmento.
+
 ```python
 sentry_sdk.init(
     dsn=dsn,
@@ -64,6 +66,8 @@ Si falta `sentry-sdk` o la inicialización falla, se imprime un warning y el pro
 ## Desactivar Sentry
 
 ```python
+from qyro import ApplicationContext
+
 ctx = ApplicationContext(enable_sentry=False)
 ```
 
@@ -77,3 +81,15 @@ Esto selecciona el hook de consola aunque exista `sentry_dsn`. Recuerda que el p
 - No se envían logs, breadcrumbs personalizados ni información de usuario desde Qyro.
 
 No incluyas secretos en mensajes de excepción. Las funciones criptográficas no registran plaintext ni runtime secrets, pero tu aplicación puede hacerlo accidentalmente.
+
+```mermaid
+flowchart TD
+    settings["Settings combinados"] --> enabled{"¿enable_sentry y sentry_dsn?"}
+    enabled -->|"Sí"| sentry["Inicializar sentry-sdk"]
+    enabled -->|"No"| console["Instalar hook de consola"]
+    sentry --> result{"¿SDK e inicialización disponibles?"}
+    result -->|"Sí"| integrations["Integraciones del SDK"]
+    result -->|"No"| warning["Warning y continuar"]
+```
+
+Un fallo de Sentry no instala automáticamente el hook Qyro de consola. La selección ocurre al construir el contenedor; `install` ocurre durante el arranque. No se promete cubrir todos los errores de callbacks o threads.

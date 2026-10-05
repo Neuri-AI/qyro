@@ -1,99 +1,58 @@
 ---
-title: "Estructura del proyecto"
-description: "Directorios reconocidos por el runtime y organización del repositorio."
+title: "Estructura de un proyecto"
+description: "Comprender el proyecto generado por Qyro CLI y sus carpetas settings y resources."
 ---
 
-# Estructura del proyecto
+# Estructura de un proyecto
 
-Qyro acepta una estructura compacta o una jerarquía compatible con proyectos generados por Qyro CLI.
+Qyro CLI crea el proyecto inicial mediante `qyro init`. La plantilla elegida proporciona código, dependencias y configuración; a partir de ahí desarrollas dentro de esa estructura.
 
-## Aplicación recomendada
+Para los datos de la aplicación hay dos carpetas principales: **`settings/` para configuración** y **`resources/` para archivos de entrada**.
 
 ```text
 mi-app/
 ├── pyproject.toml
-├── main.py
+├── main.py                 # o el entry_point de la plantilla
 ├── settings/
 │   ├── base.json
-│   ├── windows.json
-│   ├── mac.json
-│   ├── linux.json
-│   └── secrets.json       # solo desarrollo; no versionar
-└── resources/
-    ├── base/
-    │   ├── icons/
-    │   ├── images/
-    │   └── styles/
-    ├── windows/
-    ├── mac/
-    └── linux/
+│   ├── windows.json         # opcional
+│   ├── mac.json             # opcional
+│   ├── linux.json           # opcional
+│   ├── release.json         # perfil para entregas
+│   └── secrets.json         # local, cuando corresponda
+├── resources/
+│   ├── base/
+│   ├── windows/             # opcional
+│   ├── mac/                 # opcional
+│   └── linux/               # opcional
+├── views/                  # organización que puede añadir la plantilla
+└── components/             # organización que puede añadir la plantilla
 ```
 
-El archivo `pyproject.toml` ayuda a `SystemEnvironmentAdapter` a descubrir la raíz cuando se ejecuta desde código fuente. También considera como raíz el primer ancestro que contenga un directorio `src/`.
+El árbol muestra la organización habitual; las plantillas pueden añadir módulos y assets propios. Las carpetas opcionales se utilizan cuando tu aplicación necesita diferencias por plataforma.
 
-## Jerarquía compatible con CLI
+## Código y dependencias
 
-Los adaptadores también reconocen:
+`pyproject.toml` describe el proyecto y sus dependencias. El archivo indicado por `entry_point` en settings inicia la aplicación. Los módulos adicionales contienen vistas, componentes y lógica propia: organízalos según las necesidades del proyecto generado.
 
-```text
-mi-app/
-└── src/
-    ├── main/
-    │   ├── settings/
-    │   └── resources/
-    └── build/
-        └── settings/
-```
+El CLI utiliza estos datos para ejecutar y construir la aplicación. No tienes que trasladar su configuración al código cada vez que llamas a `qyro start`.
 
-Para configuración, el orden de directorios en modo source es:
+## `settings/`: configuración
 
-1. `settings/`
-2. `build/settings/`
-3. `src/main/settings/`
-4. `src/build/settings/`
-5. la raíz del proyecto
+`base.json` contiene los valores comunes: nombre, versión, autor, binding y entry point, además de opciones que tu aplicación necesite leer.
 
-Para recursos se consultan `resources/` y `src/main/resources/`, primero sus carpetas de plataforma y después `base/` y la raíz de recursos.
+Los JSON de plataforma permiten definir diferencias para Windows, macOS o Linux. `release.json` contiene opciones del tooling para preparar entregas. `secrets.json` es local y no debe contener credenciales que versiones públicamente. La combinación y el tratamiento de secretos se explican en [Settings](/es/settings) y [Secrets](/es/secrets).
 
-## Build protegido
+## `resources/`: archivos de la aplicación
 
-Qyro CLI puede producir:
+Guarda aquí textos, imágenes, fuentes, estilos, plantillas y otros assets. `resources/base/` contiene los archivos comunes; las carpetas de plataforma contienen variantes cuando las necesites.
 
-```text
-mi-app/
-└── .qyro/
-    ├── protected_resources.pak
-    └── runtime*.so | runtime*.pyd | runtime*.dylib
-```
+Tu código consulta esos archivos mediante el Engine. El CLI los incorpora al build según su configuración. Así mantienes un nombre de recurso en el código mientras su ubicación física cambia al empaquetar. La guía [Resources](/es/resources) desarrolla su uso.
 
-El runtime descifra el paquete en un directorio temporal, expone internamente sus carpetas `settings/` y `resources/`, y mantiene `.qyro/secrets.enc` únicamente en memoria. Consulta [Recursos protegidos](/es/protected-resources).
+## Artefactos generados
 
-## Estructura de este repositorio
+Al construir y preparar entregas aparecen `build/`, `release/` y `.qyro/`. Son resultados del tooling, separados del código y los datos de entrada. Si necesitas opciones de build adicionales, el CLI puede leer `build.json` en la raíz.
 
-```text
-qyro/
-├── domain/               # entidades y errores sin infraestructura
-├── application/
-│   ├── ports/            # contratos abstractos
-│   └── use_cases/        # flujos de aplicación
-├── adapters/
-│   ├── environment/      # root, bundle y modo de ejecución
-│   ├── frameworks/       # Qt, Kivy, Tkinter y headless
-│   ├── platform/         # SO y entorno Linux
-│   ├── resources/        # filesystem, bundles y criptografía
-│   ├── settings/         # JSON y secretos
-│   └── telemetry/        # consola y Sentry
-├── client/               # fachadas ApplicationContext y Component
-├── ui/                   # re-export estable de Component
-├── container.py          # composition root
-└── __init__.py           # API pública y helpers procedurales
-```
+Versiona código, configuración pública y assets; excluye secretos y artefactos generados en el `.gitignore` de tu proyecto. Guarda preferencias o documentos del usuario en una ubicación escribible apropiada, separada de los recursos de instalación.
 
-Fuera del paquete:
-
-- `tests/` cubre componentes, contexto, recursos y criptografía.
-- `.github/workflows/python-publish.yml` construye y publica al crear un release.
-- `.github/dependabot.yml` revisa semanalmente dependencias Poetry.
-- `pyproject.toml` define paquete, versión, dependencias y extras.
-- `README.md` presenta el proyecto y su matriz de compatibilidad.
-- `LICENSE` aplica MIT al runtime.
+Continúa con [Build, bundle y distribución](/es/tooling) para completar el recorrido del CLI.

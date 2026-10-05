@@ -5,9 +5,16 @@ description: "Diagnóstico de framework, settings, recursos, iconos, singleton y
 
 # Solución de problemas
 
+Empieza confirmando intérprete, paquete importado y carpeta de trabajo. Los fragmentos con `ctx` presuponen un contexto creado con el framework correcto; los atributos `_...` son diagnóstico interno.
+
+```bash
+python -c "import sys, qyro; print(sys.executable); print(qyro.__file__)"
+python -m qyro_cli --help
+```
+
 ## Se eligió un framework inesperado
 
-Comprueba quién inicializó el singleton primero:
+Comprueba el contexto global ya inicializado:
 
 ```python
 from qyro.client.context import ApplicationContext
@@ -34,7 +41,7 @@ Para comportamiento determinista, crea el contexto principal antes de importar m
 ctx = ApplicationContext(framework="headless")
 print(ctx.container.env_adapter.get_root_dir())
 print(ctx.container.settings_adapter._find_settings_dir())  # diagnóstico interno
-print(ctx.app_settings)
+print(ctx.app_settings.get("app_name"))  # evita imprimir secretos
 ```
 
 Verifica que la carpeta contenga `base.json`; no basta con que exista. El adaptador ignora silenciosamente JSON inválido, así que valídalo con:
@@ -68,7 +75,7 @@ Comprueba mayúsculas/minúsculas, especialmente al pasar de Windows/macOS a Lin
 
 ## El icono no se muestra
 
-- Confirma `Path(ctx.get_app_icon_path()).exists()`.
+- Comprueba que `ctx.get_app_icon_path()` no sea `None` antes de convertirlo a `Path` y confirmar que el archivo exista.
 - En Windows prefiere `.ico`; para Tkinter otros formatos dependen de `PhotoImage`.
 - En Qt evita crear widgets de un binding y seleccionar otro adaptador.
 - Algunos escritorios ignoran iconos de ventana o usan metadata del bundle.
@@ -76,7 +83,7 @@ Comprueba mayúsculas/minúsculas, especialmente al pasar de Windows/macOS a Lin
 
 ## El título se sobrescribe
 
-Qyro conserva un título explícito detectado después del constructor. Si tu toolkit asigna el título más tarde, hazlo en `component_did_mount()` o después de crear la ventana:
+Qyro conserva un título explícito detectado después del constructor. Para fijar el título final tras completar los hooks y la inicialización automática, asígnalo después de crear la ventana:
 
 ```python
 window.window_title = "Título final"
@@ -85,6 +92,8 @@ window.window_title = "Título final"
 ## El componente no recibe un keyword nativo
 
 `Component` reserva solo `parent`; el resto se convierte en props. Pasa el argumento nativo posicionalmente o consúmelo en tu `__init__` antes de llamar al padre.
+
+En PyQt5, pasar props por keyword también puede producir `RuntimeError: super-class __init__() of type ... was never called`: el wrapper consulta el objeto SIP antes de inicializarlo. El [ejemplo PyQt5](/es/frameworks/pyqt5) usa un constructor explícito con argumentos posicionales y asigna props después de inicializar el widget. Es un fallo observado del Engine, no un requisito de PyQt5.
 
 ## Los estilos no se aplican
 
@@ -126,3 +135,21 @@ Fuerza headless para tests de lógica. Los tests propios usan fakes y no necesit
 ## Excepciones que no llegan a Sentry
 
 Algunos toolkits capturan callbacks. Confirma primero que `sentry-sdk` se instaló y que settings contiene `sentry_dsn`; una variable `SENTRY_DSN` por sí sola no hace que `EngineContainer` seleccione el adaptador Sentry.
+
+## El CLI no encuentra el proyecto o el entry point
+
+Ejecuta desde la carpeta con `pyproject.toml` y `settings/base.json`. `start` utiliza su propio intérprete; activar otro entorno solo para instalar el toolkit no basta. Usa `python -m qyro_cli --help` para comprobar el módulo y las opciones reales. `init` requiere `--name`, no un nombre posicional.
+
+## Build falla antes de PyInstaller
+
+Instala el extra `desktop` del CLI y un compilador C compatible. El runtime se compila con Cython incluso sin protección completa de recursos. En esa ruta debe existir `settings/secrets.json` con al menos `{}`. Un build para otro perfil no proporciona compilación cruzada; Android/iOS carecen de caso de uso conectado en el contenedor actual. Consulta [Tooling](/es/tooling).
+
+## La UI de Pydux se bloquea o sigue recibiendo callbacks
+
+Los async thunks resuelven el resultado dentro de `dispatch`; no convierten automáticamente una tarea lenta en trabajo no bloqueante. La entrega de cambios de `Reactive` tampoco salta automáticamente al hilo gráfico. Usa el mecanismo de tareas de tu framework y entrega los cambios en el hilo de UI.
+
+Al cerrar, llama explícitamente al cleanup de `Reactive` o a `ReactiveBinding.dispose()`. Cancelar una suscripción evita cambios futuros, pero no cancela un callback inicial ya encolado. El [ejemplo de integración](/es/pydux) aplica un guard de cierre.
+
+## Kivy construye widgets dos veces
+
+El `render()` de `Component` se llama durante la construcción; `App.build()` también tiene su propio momento de ejecución. No llames de nuevo a `render()` desde `build()` si ya creaste la UI en el hook. El [ejemplo Kivy](/es/frameworks/kivy) usa composición y deja la construcción exclusivamente a `App.build()`.

@@ -5,7 +5,7 @@ description: "Ciclo de vida, props, estilos, resize y utilidades de Component."
 
 # Componentes
 
-`Component` agrega un ciclo de vida inspirado en componentes de clase de React a widgets Python. Está disponible como `qyro.Component`, `qyro.ui.Component` y `qyro.ui.component.Component`.
+`Component` organiza la construcción de un widget mediante hooks síncronos. Un **hook** es un método que sobrescribes para ejecutar código en una etapa; un **mixin** añade comportamiento por herencia. El framework sigue proporcionando widgets y eventos. No hay render reactivo ni reconciliación de árboles. Está disponible como `qyro.Component`, `qyro.ui.Component` y `qyro.ui.component.Component`.
 
 ## Dos formas de uso
 
@@ -42,7 +42,7 @@ class Card(QWidget, Component):
     STYLES = "QWidget { border-radius: 8px; background: #252033; }"
 
     def component_will_mount(self):
-        self.model = load_model()
+        self.model = {"name": "Invitado"}
 
     def render(self):
         self.title = QLabel(self.props.get("title", "Sin título"), self)
@@ -55,6 +55,20 @@ class Card(QWidget, Component):
 ```
 
 El flag interno `_component_lifecycle_mounted` evita montajes repetidos.
+
+```mermaid
+stateDiagram-v2
+    [*] --> Constructor
+    Constructor --> Preparacion : component_will_mount
+    Preparacion --> Construccion : render
+    Construccion --> Montado : component_did_mount
+    Montado --> Estilizado : set_styles
+    Estilizado --> Activo : on_resize inicial
+    Activo --> Activo : resizeEvent de Qt y on_resize
+    Activo --> EliminacionSolicitada : destroy_component
+```
+
+Son etapas ejecutadas, no un enum de estados almacenado. `component_did_mount` significa que se ejecutó `render`, no que la ventana esté pintada. Un resize Qt puede llegar antes de terminar la construcción de tus hijos; protege accesos con `hasattr` si es necesario. Cambiar props no programa un nuevo render.
 
 ## Props
 
@@ -71,8 +85,10 @@ card = Card(parent=window, title="Perfil", user_id=7)
 
 `props` crea perezosamente un diccionario vacío y también admite asignación completa:
 
+<Warning>En la ejecución local con PyQt5, pasar props por keyword produjo `RuntimeError: super-class __init__() ... was never called`: el wrapper consulta `self.props` antes de inicializar el objeto SIP. No es una garantía multiplataforma para todos los bindings. Los ejemplos PyQt utilizan argumentos posicionales y asignan props después del constructor nativo; el fallo queda registrado sin cambiar el Engine.</Warning>
+
 ```python
-self.props = {"title": "Nuevo"}
+self.props = {"title": "Nuevo"}  # después de inicializar el widget nativo
 ```
 
 ## Resize responsivo
@@ -138,3 +154,11 @@ class MainWindow(QMainWindow, Component, ApplicationContext):
 - El valor retornado por `render()` no es usado por el ciclo de vida de `Component`; Kivy puede reutilizarlo desde su propio `build()`.
 - Los hooks no son async.
 - Muchas operaciones visuales son best-effort y silencian errores del toolkit.
+
+## Destrucción y suscripciones
+
+`destroy_component()` no invoca `component_will_unmount` ni cierra conexiones o bindings externos. Solo desacopla el widget y solicita borrado si tiene los métodos correspondientes. Con [Pydux](/es/pydux), llama explícitamente al cleanup desde cierre/destrucción nativos.
+
+Tkinter/Kivy requieren sus eventos propios de tamaño y estilos. En una `App` Kivy evita construir dos veces desde `render` y `build`: sigue [Kivy](/es/frameworks/kivy). Los hooks no usan el valor de retorno de `render`.
+
+El `Panel` de [Aplicaciones completas](/es/examples) es ejecutable y une props, señales, estado local y un stylesheet de recurso. Los fragmentos de esta guía que usan `QWidget`, `QLabel` o `window` presuponen esos objetos/imports en una aplicación Qt ya inicializada.

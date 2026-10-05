@@ -1,0 +1,154 @@
+---
+title: "Informe de auditoría documental"
+description: "Cambios, evidencia de ejecución, discrepancias y decisiones pendientes."
+---
+
+# Informe de auditoría documental
+
+La reconstrucción se basa en los checkouts locales de Qyro Engine, Qyro CLI y Pydux revisados el 5 de octubre de 2026. Se contrastaron implementación, exports, modelos, configuración, packaging, tests, scripts, ejemplos y workflows con los README y documentación existentes. El texto adjunto se utilizó únicamente como referencia inicial. La implementación actual prevalece sobre comentarios y guías.
+
+La reconstrucción modificó únicamente `qyro/docs/es/`. Posteriormente, a petición del usuario, se actualizó la navegación española en `docs/docs.json` para incluir todas las páginas creadas. No se corrigieron bugs del código ni se editaron los otros repositorios o la documentación inglesa. Los auxiliares y artefactos de validación se crearon de forma temporal fuera de los repositorios. La auditoría inicial no verificó disponibilidad de versiones publicadas, contenido de boilerplates remotos ni resultados de CI remota. La revisión editorial posterior consultó las páginas públicas de paquetes y la estructura del boilerplate Qt, sin sustituir el código local como fuente de verdad ni ejecutar CI remota.
+
+## Estructura resultante
+
+La documentación contiene 31 páginas MDX y un proyecto con ocho scripts de aplicación, configuración y assets: 50 archivos en `docs/es/`, 16 modificados y 34 nuevos. La navegación comienza en [Introducción](/es/index); las 31 páginas están registradas en la sección española de `docs/docs.json`.
+
+| Recorrido | Páginas |
+| --- | --- |
+| Fundamentos y CLI | `index`, `cli`, `installation`, `quickstart`, `project-structure`, `tooling` |
+| Engine | `engine`, `application-context`, `components`, `settings`, `resources`, `source-frozen` |
+| Frameworks | `frameworks` y seis guías por toolkit |
+| Aplicaciones | `examples`, `example-apps/`, `pydux` |
+| Entregas y seguridad | `tooling`, `secrets`, `protected-resources`, `telemetry` |
+| Referencia y mantenimiento | `architecture`, `codebase-map`, `api-reference`, `compatibility`, `troubleshooting`, `development`, este informe |
+
+### Archivos modificados o reemplazados
+
+Se revisaron los 16 archivos originales: `index.mdx`, `installation.mdx`, `quickstart.mdx`, `project-structure.mdx`, `application-context.mdx`, `components.mdx`, `settings.mdx`, `resources.mdx`, `frameworks.mdx`, `telemetry.mdx`, `protected-resources.mdx`, `architecture.mdx`, `codebase-map.mdx`, `api-reference.mdx`, `troubleshooting.mdx` y `development.mdx`.
+
+Introducción, instalación, inicio rápido, estructura, contexto y frameworks se reemplazaron sustancialmente. Las páginas técnicas se corrigieron, ampliaron y conectaron con las nuevas guías. Se conservaron las rutas originales; no se eliminaron archivos anteriores. Se retiraron afirmaciones incorrectas y contenido redundante dentro de las páginas.
+
+### Archivos creados
+
+Se añadieron `cli.mdx`, `engine.mdx`, `source-frozen.mdx`, `tooling.mdx`, `compatibility.mdx`, `secrets.mdx`, `examples.mdx`, `pydux.mdx`, `audit-report.mdx` y las seis páginas `frameworks/{pyside6,pyqt6,pyqt5,pyside2,tkinter,kivy}.mdx`.
+
+El proyecto `example-apps/` contiene:
+
+- `README.md`, `pyproject.toml` y `build.json`.
+- `tkinter_app.py`, `pyside6_app.py`, `pyqt6_app.py`, `pyqt5_app.py`, `pyside2_app.py`, `kivy_app.py`, `pydux_tkinter_app.py` y `pydux_pyside6_app.py`.
+- `settings/{base,windows,mac,linux,secrets}.json`.
+- `resources/base/texts/welcome.txt`, `resources/windows/texts/welcome.txt` y `resources/base/styles/panel.qss`.
+
+## Correcciones y comportamientos aclarados
+
+Engine es el runtime; CLI crea y prepara entregas; Pydux es independiente y opcional. El recorrido editorial vigente empieza con los fundamentos de Qyro y el CLI, instala paquetes mediante pip y crea la primera aplicación con `qyro init`, PySide6 y `qyro start`. La alternativa manual se retiró del recorrido inicial. Los identificadores y comandos se contrastaron con el parser y exports actuales.
+
+Las correcciones principales incluyen:
+
+- `init` recibe `--name`; el nombre posicional mostrado en ejemplos antiguos no es la interfaz actual. `--yes` no rellena todas las preguntas. `--template-version 1.0.x` es inválido.
+- `start` usa el intérprete del CLI, no cambia al entorno Poetry/uv ni implementa watcher. No activa el perfil como lo hace build.
+- Settings del Engine se combina **superficialmente**; el repositorio del CLI combina objetos anidados **recursivamente**. No son pipelines intercambiables. `force_reload=True` no garantiza volver a leer los archivos porque el adaptador conserva caché.
+- Las raíces y prioridad de resources dependen del modo. El fallback final source es `src/main/resources`; el frozen es el bundle. Una consulta opcional ausente devuelve una ruta candidata, no `None`.
+- La detección frozen depende de `sys.frozen`; `_MEIPASS` por sí solo no activa ese modo. Un onefile usa extracción temporal de PyInstaller, distinta de la caché temporal del `.pak`.
+- `ApplicationContext.app` puede conservar el valor del boot aunque el adaptador recupere posteriormente la aplicación nativa. La primera inicialización fija la configuración global; no hay reset público.
+- `Component` ejecuta hooks síncronos de construcción. No ofrece reconciliación de estado, `set_state` ni unmount automático; el retorno de `render()` no monta un árbol de widgets.
+- Se sustituyeron ejemplos Kivy que podían construir la UI dos veces por composición con `App.build()`.
+- `build.json` pertenece al CLI. Build compila el runtime con Cython incluso sin protección completa; esa ruta exige `settings/secrets.json`. `bundle` no vuelve a congelar ni firma automáticamente el instalador.
+- `bundle` copia recursos source por defecto, aun con un build protegido. Se muestra `--no-resources` para evitar copias legibles innecesarias.
+- Los markers de extras no equivalen a una matriz universal de soporte. iOS/EMBEDDED existen como valores, pero no son producidos por los detectores correspondientes; el flujo móvil del CLI no está conectado.
+- Sentry requiere selección mediante settings además de su dependencia. Un `SENTRY_DSN` aislado no selecciona el adaptador; un fallo de inicialización no reinstala automáticamente el hook de consola.
+
+Antes insuficientemente explicados quedaron ahora documentados: directorios personalizados, precedencia de recursos protegidos, cachés, metadata frente a settings crudos, helpers globales, props frente a argumentos del widget, cierre explícito de suscripciones, hooks de frameworks del CLI, aliases `freeze`/`installer`, firma previa al bundle, formats de entrega y límites de limpieza.
+
+## Discrepancias entre documentación e implementación
+
+| Área | Resultado del contraste |
+| --- | --- |
+| Versiones Engine | `pyproject.toml` declara `1.0.0a2`; `qyro.__version__` declara `0.1.0` |
+| Versiones Pydux | Manifest `1.0.0a1`; `pydux.__version__` y textos internos conservan `3.0.0`/3.0 |
+| CLI README | Ejemplos con nombre posicional, rango `1.0.x` y extra `all` no corresponden al parser/manifest actual; los extras declarados son `desktop` y `mobile` |
+| Compatibilidad CLI | El README presenta una matriz más amplia que el YAML: la matriz revisada usa Python 3.10–3.13, no incluye PySide2 y omite algunos arranques Kivy |
+| Plantillas | Hay un proveedor de fallback empaquetado, pero el checkout no contiene `qyro_cli/templates`; no se promete scaffolding offline |
+| Plataforma | El comentario del detector menciona arquitectura CPU; esa detección no está implementada |
+| Packaging Engine | `NOTICE` se presenta como Qyro CLI; revisar su correspondencia con el artefacto Engine |
+
+### Pydux: documentación pública contrastada
+
+Se revisaron README, documentación `docs/es` y `docs/en` —inicio, conceptos, guías, integraciones y referencias—, ejemplos, adapters, toolkit, selectors, async thunks, DevTools e inspector junto con implementación y tests. Los conceptos públicos se conservaron; las garantías que no respalda el código se precisaron en [Integración opcional](/es/pydux).
+
+- Las guías de Qyro describen limpieza al unmount: Pydux implementa el hook, pero Engine no lo invoca automáticamente. El ejemplo nuevo lo conecta al cierre nativo.
+- Un ejemplo con `connect_qyro` sobre una clase plana no activa montaje ni suscripciones al instanciarla. Es necesaria una clase con hooks realmente invocados.
+- Las guías de bridges sugieren entrega segura al loop/hilo correcto en general. Los fallbacks ejecutan directamente; QTimer se programa sin receptor explícito desde el contexto llamador. No hay una garantía universal entre hilos.
+- La entrega inicial de `Reactive` se difiere, pero no comprueba cancelación antes de llamar al callback; `dispose()` tampoco retira una tarea visual ya encolada. Los ejemplos añaden guardas para el cierre que controlan.
+- El nombre async thunk y algunos consejos de uso pueden inducir a pensar que no bloquea. `dispatch` espera el resultado; con loop activo el hilo auxiliar termina con `join`. Se validó la espera real.
+- La notación `create_selector(*input_selectors, result_function, ...)` no debe interpretarse como un keyword soportado para el combiner: la función toma argumentos posicionales y `equality_fn`. Una lista vacía de inputs puede producir un selector constante, pese a la explicación de al menos un input.
+- `shallow_equal` compara los valores mediante `==`; objetos anidados pueden ejecutar igualdad estructural. No equivale a comparar solo identidades de primer nivel.
+- La referencia presenta las trazas de history como copias; el accessor copia la lista, pero conserva los objetos `ActionTrace` mutables. No supone aislamiento profundo.
+- Las excepciones de listeners posteriores se aíslan, pero `fire_immediately=True` llama inicialmente fuera de ese bloque de aislamiento. No se extiende esa garantía a toda invocación.
+- DevTools/inspector están habilitados por defecto en `configure_store`; no se omitió ese efecto de arranque. Los ejemplos lo desactivan.
+
+La documentación Qyro no duplica la referencia completa de Pydux: enseña la conexión con UI, sus límites y limpieza, y enlaza sus guías propias.
+
+## Bugs y comportamientos sospechosos
+
+| Hallazgo | Evidencia y alcance |
+| --- | --- |
+| Props keyword con PyQt5 | Reproducido: el wrapper de `Component` consulta el objeto SIP antes de inicializar el widget y provoca `RuntimeError`. El ejemplo usa constructor posicional e inicializa el widget antes de asignar props; no se cambió el Engine |
+| Secretos de tooling mezclados con cliente | El freezer incorpora el objeto completo de secretos. Contraseñas de firma en ese JSON también pueden llegar al cliente; no existe filtrado por propósito |
+| Error del signer puede revelar credenciales | El helper de ejecución construye el error con el comando completo; comandos de firma incluyen contraseñas. Detectado por inspección, sin ejecutar firma real ni introducir credenciales |
+| Nombre configurable de `.pak` | CLI admite un nombre/ruta configurado; loader del Engine busca `protected_resources.pak`. Otro basename puede quedar inaccesible para el runtime |
+| Fallback de protección externa | Error de HMAC, ZIP o extracción puede resultar en `None` y fallback ordinario. El payload de secrets presente e inválido sí falla estrictamente; no son la misma política |
+| Caché protegida | Confía en marcador `.ok` sin revalidar los archivos extraídos; no hay limpieza automática ni coordinación completa entre procesos |
+| Campos de manifest no conectados | Existen modelos/opciones adicionales para addons, Kivy y directorios; `_load_manifest` no propaga todos al manifest. No se documentó cada modelo como una opción de comando disponible |
+| Limpieza con rutas personalizadas | `freeze_dir` no se restringe al proyecto. `clean` puede eliminar una ruta configurada fuera de él; no se ejecutó sobre datos del usuario |
+| Imports base del CLI | El contenedor importa Pillow, declarado en `desktop`; un entorno con solo dependencias base puede fallar al importar el CLI |
+| DevTools Pydux | Inspector sin autenticación propia; time travel no representa necesariamente una vuelta al estado previo a la primera traza. El historial acotado y las trazas mutables necesitan contratos más precisos |
+
+Ninguno de estos hallazgos se ocultó mediante cambios de código. La protección embebida se explica como una barrera frente a inspección casual y un costo adicional de ingeniería inversa, no como almacenamiento seguro de secretos frente al propietario del cliente.
+
+## Validaciones realizadas
+
+Se utilizó Conda `playground`, Windows y Python 3.13.16. Las suites locales existentes pasaron: **Engine 39**, **CLI 187**, **Pydux 26**; total **252 tests**. Los tests de protección incluyeron compilación Cython, roundtrip criptográfico, payload manipulado y no extracción de secrets. Se utilizaron directorios temporales explícitos para evitar conflictos de permisos de fixtures previos.
+
+Se ejecutó el proyecto manual del inicio rápido anterior extrayendo sus bloques TOML/JSON/Python y comprobando título, settings, modo source y loop; solo se instrumentó el cierre automático del ensayo. También se ejecutaron los ejemplos Tkinter, PySide6, PyQt5 y Kivy con widgets reales, callbacks de contador y cierre; Kivy entró y salió de `App.run()`. Las integraciones Pydux/Tkinter y Pydux/PySide6 verificaron entrega inicial, dispatch, UI y cancelación. PyQt6 y PySide2 no estaban instalados: se revisaron imports/API y sintaxis, sin declarar ejecución gráfica.
+
+Las pruebas adicionales comprobaron prioridad Windows/base, recurso ausente requerido/opcional, raíz source/frozen simulada, merge superficial frente a recursivo, caché pese a `force_reload`, contexto compartido, selector/unsubscribe, espera del async thunk, ausencia de unmount y clase plana con `connect_qyro`.
+
+Se construyó una copia aislada de la aplicación Tkinter mediante el CLI y PyInstaller:
+
+1. Build `onedir`, protección completa deshabilitada y secretos vacíos.
+2. Ejecución desde una carpeta diferente del proyecto: settings, modo `pyinstaller`, recurso Windows y cierre automático correctos.
+3. `bundle --format dir --no-resources` y ejecución de su copia distribuible correctos.
+4. Build `onefile` con protección completa habilitada y un secreto ficticio: carga de configuración, recurso y descifrado correctos.
+
+El primer arranque frozen bajo sandbox falló al localizar Tcl/Tk pese a que sus archivos existían. El mismo artefacto funcionó al ejecutarlo fuera de esa restricción. No se registró ese fallo del entorno como bug de Qyro. Los ensayos no usaron credenciales reales ni realizaron publicación, notarización o firma real.
+
+La revisión documental final comprobó frontmatter, bloques de código, sintaxis Python, JSON, enlaces internos y correspondencia de ejemplos. Las firmas de referencia son notación, no programas ejecutables. **Los 19 diagramas de la auditoría inicial se analizaron con el parser real de Mermaid**, no solo mediante balanceo de fences.
+
+En la revisión posterior de Mintlify se registraron las 29 páginas españolas en `docs/docs.json`, sin omisiones ni duplicados, y se comprobó que la sección inglesa conservara su contenido. `mint validate --telemetry=false` detectó tres rangos de Python con `<` sin formato de código; se corrigieron en las guías PySide6, PyQt6 y PyQt5. La validación oficial posterior terminó con `build validation passed`, sin advertencias. No se publicó el sitio.
+
+`mint broken-links` emitió diez falsos positivos para rutas de frameworks anidadas en Windows: su implementación compara directorios con `/` y `\` sin normalizarlos en esa etapa. Se comprobó que los diez destinos existen y que el mismo grafo, normalizando únicamente esos separadores en memoria, devuelve cero enlaces rotos. No se modificó el CLI instalado ni se alteraron URLs válidas para eludir su fallo.
+
+## Diagramas principales
+
+Los diagramas incluyen arquitectura del ecosistema y capas internas; arranque de `ApplicationContext`; secuencia del inicio rápido; estados de montaje de `Component`; descubrimiento y prioridad de settings; prioridad de resources; decisiones source/frozen y relación con PyInstaller; creación con plantillas; build; relación build/firma/bundle; empaquetado, autenticación y extracción del `.pak`; secrets cifrados; selección de telemetría; flujo store/selectors/UI y ciclo de async thunks.
+
+Se emplearon flowcharts para decisiones, sequence diagrams para interacción temporal y un state diagram para lifecycle. Cada diagrama tiene explicación textual y limita sus pasos al comportamiento implementado.
+
+## Decisiones y validaciones pendientes
+
+Requieren decisiones de código: sincronizar versiones; corregir inicialización de props en PyQt; definir unmount y cierre; hacer explícito el contrato de reload de settings; separar secretos de firma; sanitizar errores del signer; unificar nombre del `.pak`; decidir política fail-closed y confianza de caché; conectar o retirar modelos/campos no operativos; acotar rutas de limpieza; y definir garantías de scheduling, cancelación e historial de Pydux.
+
+Requieren validación adicional: PyQt6/PySide2 gráficos, macOS/Linux, toolkits y versiones de Python no ensayados, instaladores DMG/NSIS/fpm, certificados/notarización, plantillas remotas e índice de paquetes. El soporte móvil necesita implementación y pruebas antes de presentarse como disponible.
+
+La navegación lateral española incorpora las 31 páginas; los grupos y rutas ingleses se mantienen. Las traducciones y la corrección de código quedan fuera de esta reconstrucción documental.
+
+## Revisión del recorrido de aprendizaje
+
+Por indicación del usuario, el recorrido se reorganizó como fundamentos de Qyro → Qyro CLI → Qyro Engine → Pydux opcional → demos. Se añadieron introducciones dedicadas al CLI y al Engine. Instalación muestra creación y activación de venv/Conda y paquetes con pip; el Quick Start utiliza exclusivamente un proyecto generado con CLI y PySide6. La estructura inicial explica settings y resources sin rutas de compatibilidad; esas reglas quedan en las guías técnicas avanzadas. Las demos seleccionan PySide6 por defecto y se ejecutan mediante CLI.
+
+El 5 de octubre de 2026, las páginas consultadas de [qyro-cli en PyPI](https://pypi.org/project/qyro-cli/) y [qyro-engine en PyPI](https://pypi.org/project/qyro-engine/) mostraban archivos de la versión `1.0.0a1`, mientras los manifests locales declaran `1.0.0a2`. Por eso la instalación pública utiliza nombres de paquetes y `--pre`, sin exigir una versión local todavía no confirmada como publicada. Los contratos de estas guías siguen basándose en los checkouts auditados; no se afirma equivalencia completa entre ambas versiones.
+
+La validación de la ventana Tkinter manual corresponde a la versión anterior del Quick Start. La nueva ventana PySide6 se valida mediante el caso de uso real de `start`, con cierre automático instrumentado; la descarga e instalación remota de `init` no se presentan como ejecutadas en este ensayo.
+
+La revisión editorial comprobó las 31 páginas de navegación, 42 bloques Python y enlaces internos, conservando idéntica la sección inglesa. El Quick Start PySide6 y la demo principal se ejecutaron en procesos iniciados por `python -m qyro_cli start`: se comprobaron settings, ventana y loop, y en la demo también props, recursos, estilos y contador. `mint validate --telemetry=false` pasó sin advertencias con el nuevo recorrido.

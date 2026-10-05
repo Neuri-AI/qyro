@@ -1,112 +1,58 @@
 ---
-title: "Frameworks"
-description: "Selección y comportamiento de los adaptadores Qt, Kivy, Tkinter y headless."
+title: "Frameworks y adaptadores"
+description: "Elegir toolkit y entender quién crea la aplicación y ejecuta su loop."
 ---
 
-# Frameworks
+# Frameworks y adaptadores
 
-Los adaptadores implementan `IUIFrameworkPort`, de modo que el resto del runtime no depende directamente de un toolkit.
+Un **framework UI** proporciona ventanas, widgets y eventos. Un **binding** Qt expone Qt en Python. El adaptador de Qyro conecta el arranque y unas operaciones comunes con cada toolkit; no traduce widgets entre frameworks.
 
-## Selección
+## Elegir explícitamente
 
-La prioridad es:
+La prioridad es `framework` del contexto (`framework_name` del contenedor), `binding` de settings, `framework` de settings y autodetección. Se eliminan espacios externos y se ignoran mayúsculas. Los nombres válidos son `pyside6`, `pyqt6`, `pyside2`, `pyqt5`, `kivy`, `tkinter` y `headless`.
 
-1. argumento `framework` de `ApplicationContext`/`framework_name` de `EngineContainer`;
-2. clave `binding` de settings;
-3. clave `framework` de settings;
-4. autodetección.
-
-La autodetección prueba:
-
-```text
-PySide6 → PyQt6 → PySide2 → PyQt5 → Kivy → Tkinter → Headless
+```mermaid
+flowchart TD
+    explicit{"¿Framework explícito?"} -->|"Sí"| choose["Comprobar nombre y disponibilidad"]
+    explicit -->|"No"| settings{"¿binding o framework en settings?"}
+    settings -->|"Sí"| choose
+    settings -->|"No"| auto["Probar adaptadores en orden"]
+    choose --> available{"¿Puede importarse?"}
+    available -->|"Sí"| ready["Adaptador seleccionado"]
+    available -->|"No"| error["FrameworkNotAvailableError"]
+    auto --> ready
 ```
 
-Los nombres no distinguen mayúsculas y eliminan espacios externos. Un nombre desconocido genera `FrameworkNotAvailableError` con la lista admitida. Un nombre conocido pero no instalado produce el mismo tipo de error con una sugerencia de instalación.
+Autodetección: PySide6 → PyQt6 → PySide2 → PyQt5 → Kivy → Tkinter → headless. Un nombre solicitado que no está disponible produce error, no fallback silencioso. Importable no significa que exista display utilizable. El primer contexto fija la selección habitual del proceso.
 
-```python
-ctx = ApplicationContext(framework="pyside6")
-```
+## Recorridos por toolkit
 
-Para fijarlo en configuración:
+| Toolkit | Guía | Aplicación nativa y ejecución |
+| --- | --- | --- |
+| PySide6 | [Ejemplo completo](/es/frameworks/pyside6) | Crea/reutiliza `QApplication`; `exec()` |
+| PyQt6 | [Ejemplo completo](/es/frameworks/pyqt6) | Crea/reutiliza `QApplication`; `exec()` |
+| PyQt5 | [Ejemplo completo](/es/frameworks/pyqt5) | Crea/reutiliza `QApplication`; `exec` si existe, si no `exec_` |
+| PySide2 | [Ejemplo completo](/es/frameworks/pyside2) | Igual que Qt 5; extra del Engine para Python 3.10 |
+| Tkinter | [Ejemplo completo](/es/frameworks/tkinter) | Recupera `_default_root`; `mainloop` |
+| Kivy | [Ejemplo completo](/es/frameworks/kivy) | Busca `App.get_running_app`; una app propia ejecuta `App.run` |
+| Headless | Ejemplo siguiente | Objeto de prueba en memoria; `run()` devuelve `0` |
 
-```json
-{"binding": "pyside6"}
-```
+No mezcles dos bindings Qt en un proceso. Aunque el adaptador de iconos identifica el binding de un widget por su MRO, eso no hace seguro mezclar `QApplication` y widgets de bindings distintos.
 
 ## Contrato común
 
-Cada adaptador expone:
+`IUIFrameworkPort` expone `framework_name`, `is_available()`, `create_application(argv=None)`, `run()`, `exit(code=0)` y los métodos de título/icono. Las operaciones visuales son intentos tolerantes a diferencias de toolkit; comprueba el resultado en la UI real.
 
-- `framework_name`
-- `is_available()`
-- `create_application(argv=None)`
-- `run()`
-- `exit(code=0)`
-- `set_application_icon(path)`
-- `set_window_icon(window, path)`
-- `set_window_title(window, title)`
-
-Las tres operaciones visuales retornan `bool` y son best-effort.
-
-## Qt: PySide6, PyQt6, PySide2 y PyQt5
-
-`BaseQtAdapter` reutiliza `QApplication.instance()` o crea una nueva con `argv`/`sys.argv`. `run()` prefiere `exec()` y cae a `exec_()` para Qt 5. `exit()` llama `QApplication.exit(code)`.
-
-Al crear iconos, detecta el binding real del objeto objetivo por su MRO. Esto evita mezclar `QIcon` de PyQt con widgets PySide, una causa común de warnings, símbolos duplicados y crashes nativos.
-
-Los adaptadores PySide6 y PyQt6 pueden cargar perezosamente `QApplication`. PySide2 y PyQt5 lo resuelven en el constructor si el paquete está disponible.
-
-## Kivy
-
-`create_application()` intenta devolver `App.get_running_app()`; si todavía no existe retorna `None`. `run()` busca de nuevo y, si es necesario, crea un `GenericKivyApp`.
-
-- `exit()` llama `stop()`.
-- título e icono se asignan como atributos si existen.
-- el código de salida siempre es `0`.
-
-La integración funciona mejor cuando tu clase principal hereda de `kivy.app.App` y controla `build()`.
-
-## Tkinter
-
-`create_application()` reutiliza `tkinter._default_root` y no crea una ventana inmediatamente. `ApplicationContext` puede enlazar la propia instancia cuando detecta `mainloop`.
-
-`run()` crea `tk.Tk()` si aún no existe y ejecuta `mainloop()`. `exit()` usa `destroy()`.
-
-Para iconos:
-
-- `.ico` usa `iconbitmap()` cuando está disponible;
-- otros formatos usan `PhotoImage` + `iconphoto()`;
-- la imagen se guarda en `_qyro_icon_photo` para evitar que el garbage collector la destruya.
+Tkinter no crea un root en `create_application`; `run` puede recuperar o crear uno. Kivy tampoco crea inmediatamente tu `App`; si el adaptador no conoce una app al ejecutar `run`, crea una genérica. Qt necesita su `QApplication` antes de cualquier widget, por lo que en los ejemplos se crea primero el contexto.
 
 ## Headless
 
-Siempre está disponible y es el fallback final. `HeadlessApplication` conserva `argv`; `exec()` y `exec_()` retornan `0`. El adaptador registra los títulos e iconos aplicados en memoria, útil para tests.
-
 ```python
-ctx = ApplicationContext(framework="headless", argv=["app", "--test"])
-assert ctx.run() == 0
+from qyro import ApplicationContext
+
+context = ApplicationContext(framework="headless", enable_sentry=False)
+print(context.app.argv)
+assert context.run() == 0
 ```
 
-## Matriz validada
-
-La última matriz incluida en el repositorio fue validada el **2 de octubre de 2026** sobre el flujo `init → start → build → bundle` de Qyro CLI.
-
-| Framework | Windows | macOS | Linux | Observación |
-| --- | --- | --- | --- | --- |
-| PySide6 | Python 3.10–3.14 ✅ | 3.10–3.14 ✅ | 3.10–3.14 ✅ | La matriz de workflow puede instalar combinaciones distintas de las restricciones actuales del manifiesto. |
-| PyQt6 | 3.10–3.14 ✅ | 3.10–3.14 ✅ | 3.10–3.14 ✅ | Full pass reportado. |
-| PyQt5 | 3.10–3.14 ✅ | 3.10–3.14 ✅ | 3.10–3.14 ✅ | Full pass reportado. |
-| Kivy | 3.10–3.13 ✅; 3.14 ❌ | 3.10–3.14 ✅ | 3.10–3.14 ✅ | Windows 3.14 falló en instalación. |
-| Tkinter | 3.10–3.14 ✅ | 3.10–3.14 ✅ | 3.10–3.14 ✅ | Full pass reportado. |
-| PySide2 | sin cobertura | sin cobertura | sin cobertura | No interpretar como incompatibilidad. |
-
-Consulta siempre dos datos: la matriz histórica de CI y las restricciones actuales de `pyproject.toml`. Un ✅ describe ese entorno de prueba, no una garantía universal.
-
-## Añadir un adaptador
-
-1. Implementa `IUIFrameworkPort` o hereda de `BaseUIFrameworkAdapter`.
-2. Evita importar el toolkit en el nivel del módulo si es opcional.
-3. Registra el nombre en `FrameworkFactory._FRAMEWORK_REGISTRY`.
-4. Decide su posición en la lista de autodetección.
-5. Añade tests para disponibilidad, singleton, run/exit, título e icono.
+Headless siempre está disponible; no realiza una UI real ni garantiza disponibilidad de otros frameworks. Sus setters guardan valores en memoria, útiles para tests. Para rango de Python y evidencia de pruebas consulta [Compatibilidad](/es/compatibility). Para ejecutar ejemplos con recursos consulta [Aplicaciones completas](/es/examples).

@@ -7,20 +7,22 @@ description: "Capas, puertos, adaptadores, casos de uso y composition root."
 
 El proyecto aplica una variante práctica de Clean Architecture. Las dependencias apuntan desde infraestructura hacia contratos y dominio, mientras `EngineContainer` actúa como composition root.
 
-## Capas
+Esta es una guía avanzada. Comienza por [Introducción](/es/index) y [Source/frozen](/es/source-frozen). Un **puerto** expresa un contrato; un **adaptador** lo implementa; la **raíz de composición** conecta las piezas.
 
-```text
-┌─────────────────────────────────────────────────────────────┐
-│ Cliente: ApplicationContext, Component, helpers qyro.*      │
-├─────────────────────────────────────────────────────────────┤
-│ Aplicación: casos de uso + puertos abstractos               │
-├─────────────────────────────────────────────────────────────┤
-│ Dominio: entidades, value objects, enums y errores          │
-├─────────────────────────────────────────────────────────────┤
-│ Adaptadores: filesystem, JSON, SO, frameworks, telemetría   │
-└─────────────────────────────────────────────────────────────┘
-                 EngineContainer conecta todo
+```mermaid
+flowchart TD
+    client["ApplicationContext, Component y helpers"] --> useCases["Casos de uso"]
+    useCases --> ports["Puertos de entorno, settings, recursos, UI y telemetría"]
+    adapters["Adaptadores concretos"] --> ports
+    useCases --> domain["Dominio: entidades y errores"]
+    adapters --> domain
+    container["EngineContainer"] --> adapters
+    container --> useCases
 ```
+
+Las flechas muestran dependencias/construcción, no eventos temporales. `Component` también accede al contenedor global; no todo su comportamiento pasa por un caso de uso.
+
+## Capas
 
 ### Dominio
 
@@ -70,6 +72,8 @@ Expone una API cómoda. `ApplicationContext` traduce los resultados de casos de 
 6. Construye los tres casos de uso.
 
 ```python
+from qyro import EngineContainer
+
 container = EngineContainer(
     framework_name=None,
     custom_root=None,
@@ -112,6 +116,9 @@ El contenedor no ejecuta `InitializeEngineUseCase` por sí mismo; lo hace `Appli
 Los puertos permiten usar dobles sin importar frameworks:
 
 ```python
+from qyro import AppMetadata
+from qyro.application.ports.settings import ISettingsPort
+
 class MemorySettings(ISettingsPort):
     def __init__(self, values):
         self.values = values
@@ -130,8 +137,14 @@ El contenedor actual construye adaptadores concretos internamente; para inyecci�
 
 ## Decisiones importantes
 
-- **Singleton por proceso:** adecuado para toolkits con una sola aplicación nativa, pero fija la configuración al primer uso.
+- **Contexto global:** el uso habitual comparte motor y fija opciones en la primera inicialización; las rutas por subclases/mixins usan atributos de clase y no deben considerarse gestores de motores aislados.
 - **Errores best-effort en UI:** título, icono y estilos no deben derribar el proceso por diferencias de toolkit.
 - **Errores estrictos en secretos autenticados:** un payload presente pero inválido no se ignora.
 - **Rutas de filesystem:** incluso un bundle protegido se extrae, preservando compatibilidad con APIs que exigen paths.
 - **Merge superficial:** sencillo y predecible, pero objetos anidados deben redefinirse completos.
+
+## Otros contenedores y extensión
+
+El contenedor del CLI es distinto: conecta plantillas, procesos, freezer, bundler y signer. No orquesta un build dentro del ejecutable. Pydux mantiene otro subsistema independiente de store, selectors y middleware. Consulta [Tooling](/es/tooling) y [Pydux](/es/pydux).
+
+`EngineContainer` construye adaptadores concretos y no recibe todos sus puertos como parámetros de inyección. Para una alternativa instancia casos de uso directamente con tus puertos o prepara otra composición. No hay registro público de plugins implementado.

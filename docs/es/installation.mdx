@@ -1,90 +1,120 @@
 ---
 title: "Instalación"
-description: "Requisitos, extras opcionales y preparación del entorno de desarrollo."
+description: "Crear un entorno Python e instalar Qyro CLI y PySide6 con pip."
 ---
 
 # Instalación
 
-Qyro requiere Python 3.10 o superior y menor que 3.16. El paquete base instala `cryptography`; los toolkits gráficos y Sentry son extras opcionales.
+En esta página prepararás un entorno aislado e instalarás las herramientas para crear una aplicación con Qyro CLI y PySide6. Un **entorno** separa el intérprete y las dependencias de este proyecto de las de otros proyectos.
 
-<Note>El nombre de distribución declarado en `pyproject.toml` es `qyro-engine`; el módulo que se importa en Python se llama `qyro`.</Note>
+Utiliza **Python 3.13** para seguir este recorrido. El Engine admite un rango más amplio, pero cada binding tiene sus propios requisitos. Puedes preparar el entorno con `venv` o Conda; elige una de las dos opciones siguientes.
 
-## Desde el repositorio
+## 1. Crear y activar el entorno
 
-La forma reproducible de trabajar en este código es con Poetry:
+### Con venv
 
-```bash
-git clone https://github.com/Neuri-AI/qyro.git
-cd qyro
-poetry install
-```
-
-Instala un toolkit concreto:
+Necesitas Python 3.13 instalado. Desde tu carpeta de trabajo, crea el entorno:
 
 ```bash
-poetry install -E pyside6
-poetry install -E pyqt6
-poetry install -E pyside2
-poetry install -E pyqt5
-poetry install -E kivy
-poetry install -E sentry
+python -m venv .venv
 ```
 
-Para instalar todos los extras declarados:
+`venv` crea `.venv/` con un intérprete y espacio propio para instalar paquetes. Actívalo según tu terminal.
+
+En **Windows PowerShell**:
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+```
+
+En **Windows CMD**:
+
+```bat
+.venv\Scripts\activate.bat
+```
+
+En **macOS o Linux**:
 
 ```bash
-poetry install --all-extras
+source .venv/bin/activate
 ```
 
-## Extras disponibles
+La activación hace que `python`, `pip` y los comandos instalados correspondan al entorno. Para salir después, utiliza `deactivate`.
 
-| Extra | Dependencia | Restricción adicional |
+### Con Conda
+
+Si utilizas Conda, crea y activa un entorno:
+
+```bash
+conda create --name qyro-app python=3.13 pip -y
+conda activate qyro-app
+```
+
+La primera orden crea el entorno `qyro-app` con Python y pip; `-y` acepta la confirmación. La segunda lo activa. Puedes elegir otro nombre. Para salir después, utiliza `conda deactivate`.
+
+### Confirmar el intérprete
+
+Con el entorno activo:
+
+```bash
+python --version
+python -m pip install --upgrade pip
+```
+
+Comprueba que la versión sea la que elegiste. La segunda orden actualiza pip dentro de ese entorno. Usaremos `python -m pip` para que las instalaciones correspondan al intérprete activo.
+
+## 2. Instalar Qyro para PySide6
+
+```bash
+python -m pip install --pre "qyro-cli[desktop]" "qyro-engine[pyside6]"
+```
+
+Esta orden instala desde el índice de paquetes:
+
+- **`qyro-cli[desktop]`:** el comando `qyro` y herramientas de escritorio, incluidas PyInstaller, Pillow y Cython.
+- **`qyro-engine[pyside6]`:** el motor importable como `qyro` y el binding PySide6 con el que escribirás la interfaz.
+- **`--pre`:** permite seleccionar las versiones preliminares de los paquetes, actualmente en alpha.
+
+Los corchetes indican un **extra**: un grupo de dependencias opcionales. `desktop` añade herramientas de build al CLI; `pyside6` añade un toolkit al Engine. Son extras de paquetes distintos.
+
+El desarrollo normal no necesita compilar el Engine. Para ejecutar `qyro build` sí necesitas un compilador C compatible con el Python del entorno, porque el CLI compila su módulo runtime mediante Cython. Los requisitos de build se explican en [Build y distribución](/es/tooling).
+
+## 3. Comprobar la instalación
+
+```bash
+qyro --help
+qyro version
+python -c "from qyro import ApplicationContext; from PySide6.QtWidgets import QApplication; print('Qyro y PySide6 disponibles')"
+```
+
+La ayuda comprueba el comando; `version` muestra los paquetes detectados; la última orden comprueba los imports para la primera aplicación. Si la terminal no encuentra `qyro`, confirma que el entorno esté activo y prueba `python -m qyro_cli --help`.
+
+## Otros bindings
+
+Puedes mantener el CLI e instalar el extra del Engine que corresponda a tu aplicación. Por ejemplo:
+
+```bash
+python -m pip install --pre "qyro-engine[pyqt6]"
+```
+
+| Extra del Engine | Dependencia | Rango adicional del manifest auditado |
 | --- | --- | --- |
-| `pyside6` | `PySide6 >=6.5` | Python `>=3.11,<3.15` |
-| `pyqt6` | `PyQt6 >=6.5` | Python `>=3.11,<3.15` |
-| `pyside2` | `PySide2 >=5.15` | Python `<3.11` |
-| `pyqt5` | `PyQt5 >=5.15` | Python `>=3.11,<3.14` |
-| `kivy` | `kivy >=2.2` | Sin límite adicional en el manifiesto |
-| `sentry` | `sentry-sdk >=1.30` | Opcional; solo se usa si existe un DSN |
-| `all` | Todos los anteriores | La intersección de restricciones puede no ser instalable en una sola versión de Python. |
+| `pyside6` | PySide6 | Python `>=3.11,<3.15` |
+| `pyqt6` | PyQt6 | Python `>=3.11,<3.15` |
+| `pyqt5` | PyQt5 | Python `>=3.11,<3.14` |
+| `pyside2` | PySide2 | Python 3.10 al combinarse con el rango del Engine |
+| `kivy` | Kivy | Sin marcador adicional de Python |
+| `sentry` | sentry-sdk | Sin marcador adicional de Python |
+| `all` | Todos los grupos opcionales anteriores | Se aplican los marcadores de cada dependencia |
 
-El extra `all` es útil en CI o desarrollo especializado, pero las restricciones de PySide2 y Qt 6 son mutuamente incompatibles en varias versiones de Python. Para una aplicación normal conviene instalar un único binding.
+Tkinter depende de Tcl/Tk disponible en tu Python y no requiere un extra del Engine.
 
-## Dependencias de desarrollo
-
-```bash
-poetry install --with dev -E pyside6
-poetry run pytest
-poetry run pytest --cov=qyro
-```
-
-`pytest` y `pytest-cov` pertenecen al grupo de desarrollo. Algunas pruebas del bundle protegido compilan un módulo Cython temporal; si se ejecutan en un entorno sin Cython o compilador, pueden requerir las herramientas que usa Qyro CLI.
-
-## Comprobar la instalación
-
-El modo `headless` no necesita un servidor gráfico:
+### Instalar todos los extras
 
 ```bash
-poetry run python -c "from qyro import ApplicationContext; print(ApplicationContext(framework='headless').platform.value)"
+python -m pip install --pre "qyro-engine[all]"
 ```
 
-Y para confirmar el adaptador elegido:
+`all` solicita **todos los extras del Engine**: PySide6, PyQt6, PyQt5, PySide2, Kivy y Sentry. Pip descarga e instala los que correspondan a la versión de Python del entorno según sus marcadores. Por ejemplo, en Python 3.13 el marcador de PySide2 lo excluye. No incluye el CLI ni librerías independientes de estado. Para desarrollar la primera aplicación basta con `pyside6`.
 
-```python
-from qyro import ApplicationContext
-
-ctx = ApplicationContext(framework="headless")
-print(ctx.container.framework_adapter.framework_name)
-print(ctx.metadata)
-```
-
-## Elegir el toolkit
-
-- Elige **PySide6** para una integración Qt 6 con licencia LGPL/comercial de Qt.
-- Elige **PyQt6** si tu proyecto ya utiliza el ecosistema Riverbank y su licencia es adecuada.
-- Usa **PySide2/PyQt5** solo si necesitas compatibilidad con Qt 5 y una versión de Python admitida.
-- Usa **Tkinter** para una interfaz pequeña sin dependencia PyPI adicional; la instalación de Python debe incluir Tcl/Tk.
-- Usa **Kivy** para interfaces táctiles o multiplataforma, teniendo en cuenta que el soporte móvil de Qyro aún es experimental.
-- Usa **headless** en tests, automatización o procesos sin interfaz.
-
-La matriz validada más reciente del repositorio está resumida en [Frameworks](/es/frameworks#matriz-validada).
+Continúa con [Tu primera aplicación](/es/quickstart), que utiliza el CLI para generar y ejecutar el proyecto.

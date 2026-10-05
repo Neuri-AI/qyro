@@ -5,14 +5,16 @@ description: "Resolución multiplataforma, prioridades, consultas opcionales y l
 
 # Recursos
 
-Los recursos se consultan por segmentos relativos y se devuelven como rutas absolutas.
+Un **recurso** es un archivo de entrada de la aplicación: texto, imagen, fuente, stylesheet o plantilla. Resolverlo significa localizarlo; abrirlo o interpretarlo corresponde a tu código/toolkit. No es almacenamiento de datos del usuario. Se consulta por segmentos y se devuelve una ruta absoluta.
+
+Los snippets con `context` presuponen un contexto creado; el helper se importa con `from qyro import get_resource`.
 
 ```python
 logo = context.get_resource("images", "logo.png")
 font = get_resource("fonts/Inter.ttf")
 ```
 
-`ResourceQuery.from_segments()` descompone cada argumento con `Path.parts`; ambas formas anteriores producen la misma consulta conceptual.
+`ResourceQuery.from_segments()` descompone cada argumento con `Path.parts`: puedes expresar el mismo recurso con `get_resource("images", "logo.png")` o `get_resource("images/logo.png")`. Las dos consultas del bloque anterior buscan archivos diferentes.
 
 ## Prioridad de raíces
 
@@ -31,7 +33,31 @@ resources/base/
 resources/
 ```
 
-También se prueban equivalentes bajo `src/main/resources/`.
+Las raíces ordinarias exactas, conservando solo las existentes, son estas. `R` es root en source y bundle en frozen:
+
+1. Por cada alias de plataforma: `R/resources/<alias>` y `R/src/main/resources/<alias>`.
+2. `R/resources/base`.
+3. `R/resources`.
+4. `R/src/main/resources/base`.
+5. Source: `R/src/main/resources`; frozen: `R` directamente.
+
+Antes van las raíces protegidas: `<extraído>/resources/<alias>`, `resources/base`, `resources`. Un recurso base protegido puede ganar frente a uno específico ordinario. No se usa `R/src/main/resources` como raíz directa en frozen.
+
+```mermaid
+flowchart TD
+    query["Nombre relativo"] --> custom{"¿Raíz personalizada existente?"}
+    custom -->|"Sí"| customRoot["Consultar solo esa raíz"]
+    custom -->|"No"| roots["Raíces protegidas y después ordinarias"]
+    customRoot --> search["Probar variantes en cada raíz, en orden"]
+    roots --> search
+    search --> found{"¿Existe alguna coincidencia?"}
+    found -->|"Sí"| path["Primera ruta absoluta encontrada"]
+    found -->|"No"| required{"¿required es true?"}
+    required -->|"Sí"| error["ResourceNotFoundError"]
+    required -->|"No"| candidate["Ruta candidata que puede no existir"]
+```
+
+La búsqueda se detiene en el primer resultado. `exists` también puede referirse a un directorio: comprueba `is_file` si necesitas un archivo.
 
 Esto permite sobrescribir un logo únicamente en Windows:
 
@@ -79,7 +105,7 @@ from pathlib import Path
 
 candidate = Path(optional)
 if candidate.exists():
-    use_theme(candidate)
+    print(candidate.read_text(encoding="utf-8"))
 ```
 
 El error incluye el nombre normalizado y el padre de la ruta fallback. No contiene toda la lista real de raíces probadas.
@@ -125,3 +151,9 @@ path = container.resolve_resource_use_case.execute("logo.svg")
 - Coloca defaults en `resources/base` y overrides solo donde cambien.
 - Trata `required=False` como una consulta de candidato, no como garantía de existencia.
 - No guardes secretos como recursos ordinarios.
+
+- El resolver no confina paths absolutos o `..` a una raíz. Valida nombres de usuarios antes de utilizarlos: no es un sandbox.
+- Prefiere segmentos o `/`. `Path.parts` interpreta separadores según el SO; backslashes Windows no se separan igual en Linux.
+- Cambiar una ruta del Engine no configura automáticamente su inclusión por los hooks del CLI.
+
+Las bases se explican en [Source/frozen](/es/source-frozen) y el empaquetado en [Tooling](/es/tooling).

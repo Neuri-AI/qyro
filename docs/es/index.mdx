@@ -1,79 +1,65 @@
 ---
-title: "Introducción"
-description: "Qué es Qyro Runtime, qué problemas resuelve y cómo se relaciona con Qyro CLI."
+title: "Fundamentos de Qyro"
+description: "Por qué existe Qyro y cómo organiza el desarrollo de aplicaciones Python."
 ---
 
-# Qyro Runtime
+# Fundamentos de Qyro
 
-Qyro Runtime es la capa que una aplicación gráfica Python utiliza **mientras se está ejecutando**. Centraliza el arranque del toolkit, la configuración, los recursos, la información del entorno, la telemetría y un ciclo de vida reutilizable para componentes de interfaz.
+Qyro es un ecosistema para desarrollar, ejecutar y distribuir aplicaciones Python con interfaz gráfica. Proporciona una forma común de organizar el proyecto, preparar su arranque y convertirlo en una aplicación que otra persona pueda utilizar.
 
-<Warning>Qyro está en estado alpha. Las APIs y el comportamiento pueden cambiar entre versiones. El flujo de escritorio es el foco actual; móvil todavía no se considera estable.</Warning>
+El punto de partida es una necesidad habitual: escribir la interfaz es solo una parte del trabajo. También necesitas organizar configuración y archivos, ejecutar el proyecto con sus dependencias y preparar una entrega para cada sistema operativo. Qyro reúne esas responsabilidades en un flujo de desarrollo que puedes seguir desde la terminal.
 
-## Qué incluye
+## Por qué existe
 
-| Área | Responsabilidad |
-| --- | --- |
-| Contexto | `ApplicationContext`, metadatos, plataforma, modo de ejecución, título, icono e instancia nativa de la aplicación. |
-| Configuración | Carga de `base.json`, override por plataforma y secretos. |
-| Recursos | Resolución de archivos por sistema operativo, modo source/frozen y bundles protegidos. |
-| Interfaz | Adaptadores para PySide6, PyQt6, PySide2, PyQt5, Kivy, Tkinter y modo headless. |
-| Componentes | Mixin/decorador `Component`, props, estilos y hooks de montaje y resize. |
-| Observabilidad | Hook de excepciones para consola o Sentry. |
-| Seguridad en reposo | Lectura de recursos protegidos y secretos autenticados generados por Qyro CLI. |
+Los frameworks gráficos resuelven la construcción de la interfaz y sus eventos. Alrededor de esa interfaz quedan tareas que se repiten entre aplicaciones:
 
-## Qué no incluye
+- **Organizar el proyecto:** mantener código, configuración y archivos de entrada en lugares reconocibles.
+- **Preparar el arranque:** cargar metadatos y opciones, y disponer de la aplicación nativa del framework antes de crear la interfaz.
+- **Adaptarse al sistema:** seleccionar configuración y recursos propios de Windows, macOS o Linux cuando sean necesarios.
+- **Encontrar archivos:** utilizar textos, imágenes, fuentes, estilos, plantillas y otros assets durante el desarrollo y dentro de una aplicación empaquetada.
+- **Preparar una entrega:** reunir código, intérprete, dependencias y archivos; después crear una carpeta distribuible, archivo o instalador y, cuando corresponda, firmar la aplicación.
 
-Qyro Runtime no crea proyectos, no compila, no firma y no publica aplicaciones. Esas tareas corresponden a [Qyro CLI](https://github.com/Neuri-AI/qyro-cli):
+El diseño de Qyro separa estas tareas en herramientas de desarrollo y servicios que utiliza la aplicación mientras está en ejecución. Esa separación permite mantener el mismo modelo de proyecto durante el desarrollo y al preparar una distribución.
 
-- scaffolding e inicialización de proyectos;
-- build y bundle;
-- instaladores, firma y notarización;
-- automatización de releases y distribución.
+## Los dos componentes de Qyro
 
-Tampoco incluye APIs de bridge web de ejemplos antiguos de PPG.
+**Qyro CLI** es la herramienta de terminal que utilizas para trabajar en el proyecto. Crea la estructura inicial desde una plantilla, ejecuta la aplicación y automatiza build, bundle, firma y limpieza. Es el punto de entrada del recorrido de esta documentación.
 
-## Flujo de arranque
+**Qyro Engine** es el motor que utiliza tu código al arrancar. Proporciona `ApplicationContext`, configuración, resolución de recursos, información del entorno e integración con el framework gráfico. Se instala como dependencia y se incluye en la aplicación que distribuyes.
 
-Al crear el primer `ApplicationContext`, Qyro realiza este flujo:
+Una **CLI** es una interfaz de comandos: la utilizas desde la terminal. Un **runtime** es el conjunto de servicios que acompaña a la aplicación mientras se ejecuta. Aquí esos papeles corresponden al CLI y al Engine, respectivamente.
 
-1. Descubre la raíz, plataforma y modo de ejecución.
-2. Busca y combina la configuración.
-3. Elige el adaptador de telemetría.
-4. Selecciona el framework solicitado, configurado o autodetectado.
-5. Verifica que el framework esté disponible.
-6. Instala el hook de excepciones.
-7. construye `AppMetadata` y la aplicación nativa.
-8. Comparte el mismo contenedor con los contextos creados después.
-
-```text
-ApplicationContext
-       │
-       ▼
- EngineContainer ──► entorno ──► plataforma / source / frozen
-       ├───────────► settings ─► AppMetadata
-       ├───────────► resources ► rutas absolutas
-       ├───────────► telemetry ► sys.excepthook / Sentry
-       └───────────► framework ► QApplication / Tk / Kivy / headless
+```mermaid
+flowchart LR
+    developer["Desarrollador"] --> cli["Qyro CLI"]
+    cli --> project["Proyecto: código, settings y resources"]
+    project --> app["Aplicación"]
+    app --> engine["Qyro Engine: arranque y servicios"]
+    app --> framework["Framework gráfico: interfaz y eventos"]
 ```
 
-## API de entrada
+El CLI trabaja sobre los archivos del proyecto y sus entregas. Al ejecutar la aplicación, su código utiliza el Engine y el framework gráfico. En las siguientes páginas aprenderás primero las herramientas del proyecto y después los servicios del motor.
 
-La mayoría de aplicaciones solo necesita estos símbolos:
+## Frameworks y bindings
 
-```python
-from qyro import ApplicationContext, Component, get_resource
-```
+Qyro trabaja con frameworks y bindings populares del ecosistema Python: **PySide6, PyQt6, PyQt5, PySide2, Tkinter y Kivy**.
 
-- Usa `ApplicationContext` en la ventana o aplicación principal.
-- Usa `Component` en widgets reutilizables.
-- Usa `get_resource()` cuando necesitas resolver un recurso fuera de una clase.
+Un **framework gráfico** proporciona ventanas, layouts y un bucle que atiende eventos. Un **binding** permite utilizar una biblioteca nativa desde Python: PySide y PyQt son bindings de Qt. La elección determina los imports y APIs con los que escribirás tu interfaz.
 
-Consulta [Instalación](/es/installation) y [Inicio rápido](/es/quickstart) para crear la primera aplicación.
+El CLI prepara el proyecto para la elección que hagas y el Engine conecta su arranque con ese toolkit. Tu aplicación continúa utilizando la API nativa del framework. El recorrido principal usa **PySide6**, el binding Qt elegido para la primera aplicación.
 
-## Estado y compatibilidad
+## Cómo se trabaja con Qyro
 
-El manifiesto acepta Python `>=3.10,<3.16`. Cada binding tiene además su propio rango; revisa [Frameworks](/es/frameworks) antes de elegir una combinación. La distribución declarada por el proyecto se llama `qyro-engine`, mientras que el paquete importable es `qyro`.
+Comienzas creando un entorno Python e instalando el CLI. Después utilizas `qyro init` para crear el proyecto y elegir su binding. Desarrollas la aplicación dentro de esa estructura, la ejecutas con `qyro start` y, cuando está preparada, utilizas `qyro build` y `qyro bundle` para generar una entrega.
 
-## Licencia
+La configuración del proyecto reside en **`settings/`** y los archivos de entrada de la aplicación en **`resources/`**. El Engine ofrece acceso a ambos desde el código. No tienes que diseñar ese flujo desde cero en cada proyecto.
 
-El runtime usa licencia MIT. Las aplicaciones también deben respetar las licencias del toolkit elegido y de sus propias dependencias; PySide y PyQt no tienen los mismos términos.
+## Recorrido de aprendizaje
+
+1. **Qyro:** comprende estos fundamentos.
+2. **Qyro CLI:** conoce [la herramienta](/es/cli), prepara la [instalación](/es/installation), crea [tu primera aplicación](/es/quickstart) y aprende su [estructura](/es/project-structure) y [flujo de entrega](/es/tooling).
+3. **Qyro Engine:** estudia [el motor](/es/engine), su contexto, settings, resources y componentes cuando necesites utilizarlos en tu código.
+4. **Estado compartido:** conoce la [integración opcional con Pydux](/es/pydux), después de comprender el motor.
+5. **Demos:** explora las [aplicaciones completas](/es/examples) para reunir los conceptos aprendidos.
+
+Continúa con [Qyro CLI](/es/cli).
