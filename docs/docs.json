@@ -1,0 +1,88 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "sequoia",
+  "name": "Qyro Runtime",
+  "description": "Runtime multiplataforma, contexto de aplicación, recursos, configuración y ciclo de vida para interfaces Python.",
+  "logo": "https://ik.imagekit.io/kummiktgaiq/ppg/Qyro-logo.svg?updatedAt=1755215983279",
+  "colors": {
+    "primary": "#8B5CF6",
+    "light": "#A78BFA",
+    "dark": "#7C3AED"
+  },
+  "navigation": {
+    "languages": [
+      {
+        "language": "es",
+        "groups": [
+          {
+            "group": "Primeros pasos",
+            "pages": [
+              "es/index",
+              "es/installation",
+              "es/quickstart",
+              "es/project-structure"
+            ]
+          },
+          {
+            "group": "Guías del runtime",
+            "pages": [
+              "es/application-context",
+              "es/components",
+              "es/settings",
+              "es/resources",
+              "es/frameworks",
+              "es/telemetry",
+              "es/protected-resources"
+            ]
+          },
+          {
+            "group": "Arquitectura y referencia",
+            "pages": [
+              "es/architecture",
+              "es/codebase-map",
+              "es/api-reference",
+              "es/troubleshooting",
+              "es/development"
+            ]
+          }
+        ]
+      },
+      {
+        "language": "en",
+        "groups": [
+          {
+            "group": "Getting started",
+            "pages": [
+              "en/index",
+              "en/installation",
+              "en/quickstart",
+              "en/project-structure"
+            ]
+          },
+          {
+            "group": "Runtime guides",
+            "pages": [
+              "en/application-context",
+              "en/components",
+              "en/settings",
+              "en/resources",
+              "en/frameworks",
+              "en/telemetry",
+              "en/protected-resources"
+            ]
+          },
+          {
+            "group": "Architecture and reference",
+            "pages": [
+              "en/architecture",
+              "en/codebase-map",
+              "en/api-reference",
+              "en/troubleshooting",
+              "en/development"
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

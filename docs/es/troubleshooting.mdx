@@ -1,0 +1,128 @@
+---
+title: "Solución de problemas"
+description: "Diagnóstico de framework, settings, recursos, iconos, singleton y bundles protegidos."
+---
+
+# Solución de problemas
+
+## Se eligió un framework inesperado
+
+Comprueba quién inicializó el singleton primero:
+
+```python
+from qyro.client.context import ApplicationContext
+
+container = ApplicationContext._global_container
+if container:
+    print(container.framework_adapter.framework_name)
+```
+
+`framework` explícito vence a settings; después se usan `binding`, `framework` y autodetección. Una llamada temprana a `get_resource()` o `load_build_settings()` también puede crear el contenedor procedural, aunque `ApplicationContext` reemplaza ese contenedor al inicializarse si aún no tiene uno propio.
+
+Para comportamiento determinista, crea el contexto principal antes de importar módulos con efectos secundarios y especifica el binding en `base.json`.
+
+## `FrameworkNotAvailableError`
+
+- Confirma la versión de Python y las restricciones del extra.
+- Instala un único toolkit compatible.
+- En CI sin GUI usa `framework="headless"`.
+- Un nombre válido debe ser uno de `pyside6`, `pyqt6`, `pyside2`, `pyqt5`, `kivy`, `tkinter`, `headless`.
+
+## Settings vacíos
+
+```python
+ctx = ApplicationContext(framework="headless")
+print(ctx.container.env_adapter.get_root_dir())
+print(ctx.container.settings_adapter._find_settings_dir())  # diagnóstico interno
+print(ctx.app_settings)
+```
+
+Verifica que la carpeta contenga `base.json`; no basta con que exista. El adaptador ignora silenciosamente JSON inválido, así que valídalo con:
+
+```bash
+python -m json.tool settings/base.json
+```
+
+## Un override anidado borró campos
+
+El merge es superficial. Repite el objeto completo en el archivo de plataforma:
+
+```json
+{
+  "window": {"width": 1024, "height": 600}
+}
+```
+
+## `ResourceNotFoundError`
+
+Imprime raíces y consulta opcionalmente:
+
+```python
+adapter = ctx.container.resource_adapter
+print(adapter._get_candidate_roots())  # diagnóstico interno
+candidate = ctx.get_resource("images", "logo.png", required=False)
+print(candidate)
+```
+
+Comprueba mayúsculas/minúsculas, especialmente al pasar de Windows/macOS a Linux. Usa `mac/` o `darwin/`, `windows/` o `win32/`, y `base/` para defaults.
+
+## El icono no se muestra
+
+- Confirma `Path(ctx.get_app_icon_path()).exists()`.
+- En Windows prefiere `.ico`; para Tkinter otros formatos dependen de `PhotoImage`.
+- En Qt evita crear widgets de un binding y seleccionar otro adaptador.
+- Algunos escritorios ignoran iconos de ventana o usan metadata del bundle.
+- `set_window_icon()` puede devolver truthy tras resolver la ruta aunque el toolkit no la muestre.
+
+## El título se sobrescribe
+
+Qyro conserva un título explícito detectado después del constructor. Si tu toolkit asigna el título más tarde, hazlo en `component_did_mount()` o después de crear la ventana:
+
+```python
+window.window_title = "Título final"
+```
+
+## El componente no recibe un keyword nativo
+
+`Component` reserva solo `parent`; el resto se convierte en props. Pasa el argumento nativo posicionalmente o consúmelo en tu `__init__` antes de llamar al padre.
+
+## Los estilos no se aplican
+
+- El objeto debe tener `setStyleSheet`; Kivy y Tkinter no usan QSS.
+- Si es un path de recurso, no incluyas `{` ni `;` en la cadena.
+- Comprueba la ruta con `get_resource(..., required=False)`.
+- En Qt, la activación de `WA_StyledBackground` es best-effort y depende de detectar el binding.
+
+## El bundle protegido se ignora
+
+Debes tener juntos el `.pak` y un `runtime*.so/.pyd/.dylib` compatible con el Python y SO actuales. Un HMAC inválido o ZIP ilegible hace que el loader vuelva a recursos ordinarios sin lanzar error.
+
+Para aislar:
+
+```python
+from qyro.adapters.resources.protected_bundle import ProtectedResourceBundle
+
+root = ProtectedResourceBundle.get_extracted_root(ctx.container.env_adapter)
+print(root)
+```
+
+`None` significa artefactos ausentes/incompatibles o fallo de validación/extracción.
+
+## Fallan los secretos cifrados
+
+Errores típicos:
+
+- módulo runtime compilado para otra versión/arquitectura;
+- runtime secret distinto al usado para cifrar;
+- payload modificado o truncado;
+- contenido descifrado que no es objeto JSON UTF-8.
+
+No captures el error y continúes con valores incompletos en producción. Regenera el bundle con Qyro CLI.
+
+## Tests gráficos en un servidor sin display
+
+Fuerza headless para tests de lógica. Los tests propios usan fakes y no necesitan crear ventanas reales. Para integración Qt puedes requerir `QT_QPA_PLATFORM=offscreen`, según el binding y la plataforma.
+
+## Excepciones que no llegan a Sentry
+
+Algunos toolkits capturan callbacks. Confirma primero que `sentry-sdk` se instaló y que settings contiene `sentry_dsn`; una variable `SENTRY_DSN` por sí sola no hace que `EngineContainer` seleccione el adaptador Sentry.

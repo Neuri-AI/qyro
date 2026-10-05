@@ -110,37 +110,39 @@ framework, dependency state, and CI environment used during testing.
 
 ## Installation
 
-This package is configured with Poetry extras.
+The distribution name declared by this repository is `qyro-engine`; the Python
+package imported by applications is `qyro`. The project is configured with
+Poetry extras. From a repository checkout:
 
 Base package:
 
 ```bash
-poetry add qyro
+poetry install
 
 ```
 
 With specific GUI stack:
 
 ```bash
-poetry add qyro -E pyside6
-poetry add qyro -E pyqt6
-poetry add qyro -E pyside2
-poetry add qyro -E pyqt5
-poetry add qyro -E kivy
+poetry install -E pyside6
+poetry install -E pyqt6
+poetry install -E pyside2
+poetry install -E pyqt5
+poetry install -E kivy
 
 ```
 
 With telemetry helper:
 
 ```bash
-poetry add qyro -E sentry
+poetry install -E sentry
 
 ```
 
 Everything enabled:
 
 ```bash
-poetry add qyro -E all
+poetry install --all-extras
 
 ```
 
@@ -434,6 +436,14 @@ Utility methods:
 * Framework adapters: qyro/adapters/frameworks/
 * Resource resolver: qyro/adapters/resources/filesystem_resources.py
 * Settings loader: qyro/adapters/settings/json_settings.py
+
+## Full documentation
+
+The complete bilingual documentation lives in [`docs/`](docs/). It covers
+installation, project layout, application and component lifecycles, settings
+precedence, resource lookup, every framework adapter, telemetry, protected
+resources and secrets, internal architecture, the full API, troubleshooting,
+and contributor workflows.
 
 ## 🤝 Contributing
 

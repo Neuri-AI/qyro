@@ -1,0 +1,63 @@
+---
+title: "Codebase map"
+description: "File-by-file inventory of the runtime, tests, and automation."
+---
+
+# Codebase map
+
+This is a maintenance index for the repository. Package `__init__.py` files re-export their layer's symbols unless noted otherwise.
+
+## Root and automation
+
+| File | Responsibility |
+| --- | --- |
+| `pyproject.toml` | Poetry metadata, Python range, crypto dependency, GUI/Sentry extras, and dev group. |
+| `poetry.lock` | Reproducible dependency resolution. |
+| `README.md` | Project overview, compatibility, setup, examples, and short API. |
+| `LICENSE` | MIT runtime license. |
+| `NOTICE` | Ecosystem/toolkit notices; currently headed as Qyro CLI. |
+| `.gitignore` | IDE, cache, bytecode, build, dist, src, and environment exclusions. |
+| `.github/workflows/python-publish.yml` | Release-triggered build and OIDC PyPI publication. |
+| `.github/dependabot.yml` | Weekly Poetry dependency updates. |
+| `.github/FUNDING.yml` | Buy Me a Coffee sponsorship for `neuri`. |
+| `docs/docs.json` | Mintlify theme and bilingual navigation. |
+
+## Runtime source
+
+| File/group | Responsibility |
+| --- | --- |
+| `qyro/__init__.py` | Top-level API, version, procedural singleton helpers. |
+| `qyro/container.py` | Composition root. |
+| `client/context.py` | Global context, MRO integration, metadata, title, icon, resources, loop. |
+| `client/component.py` | Mixin/decorator, props, lifecycle, styles, resize, utilities. |
+| `ui/*` | Stable `Component` re-exports. |
+| `domain/entities.py` | Platform/mode enums and resource/metadata dataclasses. |
+| `domain/errors.py` | Infrastructure-independent errors. |
+| `application/ports/*.py` | Environment, resource, settings, telemetry, and UI contracts. |
+| `application/use_cases/initialize_engine.py` | Framework validation, telemetry, metadata, native app. |
+| `application/use_cases/load_settings.py` | Metadata cache and keyed reads. |
+| `application/use_cases/resolve_resource.py` | Query construction and required-resource rule. |
+| `adapters/environment/system_environment.py` | Source/frozen, root, and bundle discovery. |
+| `adapters/platform/detector.py` | OS, Linux distro, GNOME/KDE detection. |
+| `adapters/settings/json_settings.py` | JSON precedence and secret merge. |
+| `adapters/resources/filesystem_resources.py` | Resource roots and lookup. |
+| `adapters/resources/protected_bundle.py` | `.pak` authentication, decryption, cache, extraction. |
+| `adapters/resources/runtime_secret.py` | Extension discovery/loading and secret validation. |
+| `adapters/resources/secrets_crypto.py` | AES-GCM/HKDF and `QYRSEC` validation. |
+| `adapters/telemetry/*.py` | Console and Sentry implementations. |
+| `adapters/frameworks/base.py`, `qt_base.py` | Shared adapter behavior. |
+| `adapters/frameworks/*_adapter.py` | PySide6, PyQt6, PySide2, PyQt5, Kivy, Tkinter, headless drivers. |
+| `adapters/frameworks/factory.py` | Registry, explicit selection, and auto-detection. |
+| Layer/package `__init__.py` files | Public re-exports or package markers. |
+
+## Tests
+
+| File | Coverage |
+| --- | --- |
+| `test_client_component.py` | Decorator, hook order, props, styles, utilities. |
+| `test_client_context.py` | Boot state, loop, metadata, title, icon, resources. |
+| `test_filesystem_resource_adapter.py` | Flattened and structured frozen paths. |
+| `test_protected_bundle_runtime.py` | Package/settings/resources/secrets/tampering/legacy. |
+| `test_secrets_crypto.py` | Roundtrip, headers, authentication, randomness, no logging. |
+
+Generated build directories, caches, and bytecode are not source API.

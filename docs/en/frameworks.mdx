@@ -1,0 +1,64 @@
+---
+title: "Frameworks"
+description: "Selection and behavior of Qt, Kivy, Tkinter, and headless adapters."
+---
+
+# Frameworks
+
+Every adapter implements `IUIFrameworkPort`, keeping the application layer toolkit-independent.
+
+## Selection order
+
+1. Explicit context/container framework.
+2. Settings `binding`.
+3. Settings `framework`.
+4. Auto-detection.
+
+Auto-detection order:
+
+```text
+PySide6 → PyQt6 → PySide2 → PyQt5 → Kivy → Tkinter → Headless
+```
+
+Names are case-insensitive. Unknown or unavailable explicit choices raise `FrameworkNotAvailableError`; headless is always available.
+
+## Common contract
+
+Adapters provide `framework_name`, `is_available()`, `create_application()`, `run()`, `exit()`, plus best-effort application/window icon and title methods.
+
+## Qt bindings
+
+`BaseQtAdapter` reuses `QApplication.instance()` or creates one with the supplied argv/`sys.argv`. It prefers `exec()` and falls back to `exec_()` for Qt 5.
+
+QIcon is imported from the target widget's actual binding, detected through its MRO. This prevents mixing PyQt and PySide objects, which can cause native crashes and duplicate-symbol warnings.
+
+## Kivy
+
+The adapter reuses `App.get_running_app()`. If none exists by `run()`, it creates a generic app. `exit()` calls `stop()`; title and icon use Kivy attributes when available. A real application should normally subclass `kivy.app.App` and own `build()`.
+
+## Tkinter
+
+The adapter reuses `_default_root`, creates `tk.Tk()` only when needed, runs `mainloop()`, and exits through `destroy()`. `.ico` uses `iconbitmap`; other images use `PhotoImage` and a retained reference to prevent garbage collection.
+
+## Headless
+
+The always-available adapter returns `0` from its loop and records applied titles/icons in memory. Use it for logic tests and non-GUI automation.
+
+## Validated matrix
+
+The repository's table was last validated on **October 2, 2026** for the Qyro CLI `init → start → build → bundle` workflow.
+
+| Framework | Windows | macOS | Linux | Note |
+| --- | --- | --- | --- | --- |
+| PySide6 | 3.10–3.14 ✅ | 3.10–3.14 ✅ | 3.10–3.14 ✅ | Full workflow reported. |
+| PyQt6 | 3.10–3.14 ✅ | 3.10–3.14 ✅ | 3.10–3.14 ✅ | Full workflow reported. |
+| PyQt5 | 3.10–3.14 ✅ | 3.10–3.14 ✅ | 3.10–3.14 ✅ | Full workflow reported. |
+| Kivy | 3.10–3.13 ✅; 3.14 ❌ | 3.10–3.14 ✅ | 3.10–3.14 ✅ | Windows 3.14 failed at install. |
+| Tkinter | 3.10–3.14 ✅ | 3.10–3.14 ✅ | 3.10–3.14 ✅ | Full workflow reported. |
+| PySide2 | not covered | not covered | not covered | Absence of coverage is not a failure. |
+
+Always compare historical CI results with current `pyproject.toml` constraints; a passing workflow is not a universal compatibility guarantee.
+
+## Adding an adapter
+
+Implement the port (or extend `BaseUIFrameworkAdapter`), avoid eager optional imports, register it in `FrameworkFactory`, choose an auto-detection position, and test availability, singleton creation, loop, exit, title, and icon behavior.

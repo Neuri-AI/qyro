@@ -1,0 +1,61 @@
+---
+title: "Project structure"
+description: "Runtime-recognized directories and repository organization."
+---
+
+# Project structure
+
+Recommended application layout:
+
+```text
+my-app/
+├── pyproject.toml
+├── main.py
+├── settings/
+│   ├── base.json
+│   ├── windows.json
+│   ├── mac.json
+│   ├── linux.json
+│   └── secrets.json       # development only; do not commit
+└── resources/
+    ├── base/
+    ├── windows/
+    ├── mac/
+    └── linux/
+```
+
+In source mode, `SystemEnvironmentAdapter` walks upward from the current working directory and selects the first ancestor containing `pyproject.toml` or `src/`.
+
+Qyro CLI-compatible paths are also recognized:
+
+```text
+src/main/settings/
+src/main/resources/
+src/build/settings/
+build/settings/
+```
+
+Protected builds add:
+
+```text
+.qyro/
+├── protected_resources.pak
+└── runtime*.so | runtime*.pyd | runtime*.dylib
+```
+
+## Runtime repository
+
+```text
+qyro/
+├── domain/               # entities and errors
+├── application/
+│   ├── ports/            # abstract contracts
+│   └── use_cases/        # workflows
+├── adapters/             # environment, frameworks, resources, settings, telemetry
+├── client/               # ApplicationContext and Component facades
+├── ui/                   # stable Component re-export
+├── container.py          # composition root
+└── __init__.py           # public API and procedural helpers
+```
+
+The repository also contains tests, Poetry metadata, a release-to-PyPI workflow, weekly Dependabot configuration, MIT license, and this Mintlify documentation.

@@ -1,0 +1,60 @@
+---
+title: "Protected resources and secrets"
+description: "protected_resources.pak loading, AES-GCM secrets, and the security model."
+---
+
+# Protected resources and secrets
+
+Qyro Runtime consumes protected artifacts produced by Qyro CLI. It discovers, validates, decrypts, and connects them to the normal settings/resource adapters.
+
+<Warning>This protects data at rest and detects tampering. It cannot absolutely hide a secret from someone able to run, debug, or inspect the process and its memory.</Warning>
+
+## Expected artifacts
+
+```text
+.qyro/
+├── protected_resources.pak
+└── runtime*.so | runtime*.pyd | runtime*.dylib
+```
+
+The extension module must expose a hexadecimal `RUNTIME_SECRET_HEX` representing at least 16 bytes.
+
+## Loading flow
+
+Qyro locates both artifacts, keys a cache by their path/size/mtime, loads the runtime secret, validates and decrypts the package in memory, keeps embedded `.qyro/secrets.enc` in memory, and extracts ordinary settings/resources to a deterministic temporary directory.
+
+Entries under `.qyro/` are never extracted. A `.ok` marker allows reuse, and class caches are protected by a lock.
+
+## Resource-package format
+
+```text
+QYRPKG | salt(16) | wrapped_key(32) | nonce(16) | HMAC-SHA256(32) | ciphertext
+```
+
+The resource key is wrapped with a SHA-256-derived XOR stream. Package ciphertext uses a SHA-256 counter keystream, while `HMAC-SHA256(key, nonce + ciphertext)` authenticates it. Decrypted bytes must form a ZIP. This is an internal Qyro format.
+
+If package validation/extraction fails, the protected source returns `None` and ordinary roots remain available.
+
+## Secret format
+
+Secrets use AES-256-GCM with HKDF-SHA256:
+
+```text
+QYRSEC | version | kdf_id | cipher_id | salt_len | nonce_len | salt | nonce | ciphertext+tag
+```
+
+Version/KDF/cipher IDs are currently `1`; the nonce is 12 bytes, the derived key is 32 bytes, HKDF info is `qyro-secrets-v1`, and the full header is authenticated as AAD.
+
+```python
+from qyro.adapters.resources.secrets_crypto import encrypt_secrets_payload, decrypt_secrets_payload
+
+runtime_secret = b"a" * 32
+payload = encrypt_secrets_payload(b'{"token":"abc"}', runtime_secret)
+assert decrypt_secrets_payload(payload, runtime_secret) == b'{"token":"abc"}'
+```
+
+These are infrastructure APIs; normal applications let the CLI encrypt and the runtime decrypt.
+
+The decrypted content must be a UTF-8 JSON object and shallowly overrides all earlier settings. Legacy external encrypted `.qyro/secrets.json` is supported when no embedded payload exists.
+
+Tampered ciphertext, a wrong secret, malformed headers, or invalid decrypted JSON raise `SecretsCryptoError`/`ValueError`. Keep credentials short-lived and scoped, never log runtime keys/plaintext, and prefer remote/OS secret stores for high-value credentials.

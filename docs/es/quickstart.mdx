@@ -1,0 +1,147 @@
+---
+title: "Inicio rápido"
+description: "Ejemplos completos con Qt, Tkinter, Kivy y uso procedural."
+---
+
+# Inicio rápido
+
+Antes de ejecutar los ejemplos, crea una configuración mínima:
+
+```text
+mi-app/
+├── main.py
+├── settings/
+│   └── base.json
+└── resources/
+    └── base/
+        └── icons/
+            └── app.png
+```
+
+```json
+{
+  "app_name": "Mi aplicación",
+  "version": "1.0.0",
+  "author": "Tu nombre",
+  "identifier": "com.ejemplo.miapp",
+  "binding": "pyside6",
+  "icon": "icons/app.png"
+}
+```
+
+## PySide6 / Qt
+
+```python
+import sys
+
+from PySide6.QtWidgets import QLabel, QMainWindow
+from qyro import ApplicationContext, Component
+
+
+class MainWindow(QMainWindow, Component, ApplicationContext):
+    STYLES = "QMainWindow { background: #17141f; color: white; }"
+
+    def component_will_mount(self) -> None:
+        self.resize(640, 360)
+
+    def render(self) -> None:
+        self.label = QLabel(parent=self)
+        self.label.move(24, 24)
+        self.label.setText(
+            f"{self.window_title}\n"
+            f"Plataforma: {self.platform.value}\n"
+            f"Modo: {self.execution_mode.value}"
+        )
+
+    def on_resize(self) -> None:
+        if hasattr(self, "label"):
+            self.label.resize(self.calc(self.width(), 80), 96)
+
+
+if __name__ == "__main__":
+    window = MainWindow()
+    window.show()
+    sys.exit(window.run())
+```
+
+El orden de herencia es importante para permitir que Qt construya primero el widget y que los mixins coordinen el arranque. Qyro envuelve el `__init__` de la subclase, crea `QApplication` antes de `QMainWindow` y monta `Component` al terminar.
+
+## Tkinter
+
+```python
+import tkinter as tk
+
+from qyro import ApplicationContext, Component
+
+
+class MainWindow(tk.Tk, Component, ApplicationContext):
+    def component_will_mount(self) -> None:
+        self.geometry("520x220")
+
+    def render(self) -> None:
+        tk.Label(
+            self,
+            text=f"{self.window_title} · {self.platform.value}",
+        ).pack(padx=24, pady=48)
+
+
+if __name__ == "__main__":
+    MainWindow().run()
+```
+
+Tkinter no tiene `setStyleSheet`, por lo que `Component.set_styles()` simplemente no hace nada. Sus demás hooks siguen ejecutándose.
+
+## Kivy
+
+```python
+from kivy.app import App
+from kivy.core.window import Window
+from kivy.uix.label import Label
+
+from qyro import ApplicationContext, Component
+
+
+class MainApp(App, Component, ApplicationContext):
+    def component_will_mount(self) -> None:
+        Window.size = (640, 360)
+
+    def render(self):
+        return Label(
+            text=f"{self.window_title}\n{self.platform.value}",
+            halign="center",
+        )
+
+    def build(self):
+        return self.render()
+
+
+if __name__ == "__main__":
+    MainApp().run()
+```
+
+Kivy controla su propio `App`; por ello el adaptador intenta reutilizar `App.get_running_app()` y, si no existe, `run()` crea una aplicación genérica. En una subclase real como la anterior, `App.run()` participa en el MRO.
+
+## Uso sin clase
+
+Las funciones de conveniencia usan el mismo contenedor global que `ApplicationContext`:
+
+```python
+from qyro import get_resource, is_frozen, load_build_settings
+
+settings = load_build_settings()
+logo = get_resource("images", "logo.png")
+optional = get_resource("themes", "custom.qss", required=False)
+
+print(settings.get("app_name"))
+print(logo)
+print(is_frozen())
+```
+
+Con `required=False`, el resultado sigue siendo una ruta absoluta candidata aunque el archivo no exista. Verifica con `Path(optional).exists()` cuando la ausencia sea válida.
+
+## Siguientes pasos
+
+- [ApplicationContext](/es/application-context): singleton, metadatos, título e icono.
+- [Componentes](/es/components): props, estilos y hooks.
+- [Configuración](/es/settings): archivos, merge y precedencia.
+- [Recursos](/es/resources): búsqueda por plataforma y bundles.

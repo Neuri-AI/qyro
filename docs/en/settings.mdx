@@ -1,0 +1,77 @@
+---
+title: "Settings"
+description: "JSON discovery, shallow merging, metadata, caching, and secrets."
+---
+
+# Settings
+
+`JsonSettingsAdapter` discovers hierarchical JSON configuration and produces both raw settings and `AppMetadata`.
+
+## Platform files
+
+`base.json` identifies a settings directory. Qyro then loads the first matching override:
+
+| Platform | Names in order |
+| --- | --- |
+| Windows | `windows.json`, `win32.json` |
+| macOS | `mac.json`, `darwin.json` |
+| Linux | `linux.json` |
+
+## Value precedence
+
+```text
+base.json
+  < platform JSON
+  < plain secrets.json
+  < encrypted embedded/legacy secrets
+```
+
+Merging uses shallow `dict.update()`. Replacing `{"window": {"width": 800}}` replaces the entire previous `window` object; it is not a deep merge.
+
+## Directory discovery
+
+In source mode, the first directory containing `base.json` wins:
+
+1. `settings/`
+2. `build/settings/`
+3. `src/main/settings/`
+4. `src/build/settings/`
+5. project root
+
+If absent, Qyro tries the protected package. Frozen mode prefers the protected package before ordinary bundle paths. `EngineContainer(custom_settings_dir=...)` bypasses discovery when that directory exists.
+
+## Metadata and runtime keys
+
+| Key | Metadata default |
+| --- | --- |
+| `app_name` | `QyroApp` |
+| `version` | `1.0.0` |
+| `author` | `Developer` |
+| `identifier` | `com.qyro.app` |
+| `description` | empty string |
+
+All unknown keys remain in `raw_settings`. Runtime-specific keys include `binding`/`framework`, `sentry_dsn`, and `icon`/`app_icon`.
+
+```json
+{
+  "app_name": "Inventory",
+  "version": "2.3.0",
+  "binding": "pyside6",
+  "icon": "icons/app.png",
+  "theme": "dark"
+}
+```
+
+## Caching
+
+The adapter caches the first dictionary. `LoadSettingsUseCase` separately caches metadata. `execute(force_reload=True)` rebuilds metadata from the adapter, but does not invalidate the adapter cache. Settings are startup configuration, not hot-reload state.
+
+## Secrets
+
+A development `secrets.json` beside settings (or under root `settings/`) overrides ordinary values. Do not commit it.
+
+Production bundles can embed `.qyro/secrets.enc` inside `protected_resources.pak`. The legacy encrypted path `.qyro/secrets.json` is also supported. Decrypted data must be a UTF-8 JSON object.
+
+Ordinary JSON parse failures are ignored. Authenticated-secret errors are raised, because silently continuing could start the application with incomplete credentials. See [Protected resources](/en/protected-resources).
+
+`SettingsNotFoundError` exists in the domain, but the current adapter returns empty settings and default metadata when no directory is found.

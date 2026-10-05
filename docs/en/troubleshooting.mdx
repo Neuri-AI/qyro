@@ -1,0 +1,72 @@
+---
+title: "Troubleshooting"
+description: "Diagnose toolkit, settings, resources, icons, singleton, and protected-bundle issues."
+---
+
+# Troubleshooting
+
+## The wrong framework was selected
+
+Selection is explicit argument, settings `binding`, settings `framework`, then auto-detection. The first global initialization wins.
+
+```python
+from qyro.client.context import ApplicationContext
+
+container = ApplicationContext._global_container
+if container:
+    print(container.framework_adapter.framework_name)
+```
+
+Initialize the main context before importing modules with startup side effects, and pin the binding in `base.json`.
+
+## `FrameworkNotAvailableError`
+
+Check your Python version against the selected extra, install only one compatible binding, and use `headless` in GUI-less CI. Valid names are `pyside6`, `pyqt6`, `pyside2`, `pyqt5`, `kivy`, `tkinter`, and `headless`.
+
+## Settings are empty
+
+Confirm the detected root and that the candidate directory contains `base.json`. Invalid ordinary JSON is silently skipped.
+
+```bash
+python -m json.tool settings/base.json
+```
+
+Nested objects are replaced rather than deep-merged; repeat the complete object in platform overrides.
+
+## Resource not found
+
+Check case sensitivity, OS directory names, and use `required=False` to inspect the candidate path. On Linux, filenames that worked case-insensitively elsewhere may fail.
+
+```python
+candidate = context.get_resource("images", "logo.png", required=False)
+print(candidate)
+```
+
+## Icon/title/style problems
+
+- Confirm the icon path exists and use `.ico` on Windows where appropriate.
+- Some desktop environments ignore per-window icons.
+- `set_window_icon()` can report a resolved path even if the toolkit does not display it.
+- Assign the final title after initialization if the toolkit changes it later.
+- `Component` only supports QSS on objects implementing `setStyleSheet`; it does not translate styles for Kivy/Tkinter.
+
+## Native keyword became a prop
+
+`Component` reserves only `parent`. Pass other native arguments positionally or consume them in your own constructor.
+
+## Protected bundle is ignored
+
+Keep the `.pak` beside a platform/Python-compatible runtime extension. Invalid package HMAC or ZIP data falls back silently to ordinary roots.
+
+```python
+from qyro.adapters.resources.protected_bundle import ProtectedResourceBundle
+print(ProtectedResourceBundle.get_extracted_root(context.container.env_adapter))
+```
+
+`None` means missing/incompatible artifacts or validation/extraction failure.
+
+Encrypted-secret failures are strict: mismatched runtime secret, tampering, truncation, or non-object JSON raises an error. Regenerate the artifacts together rather than continuing with partial settings.
+
+## Sentry did not capture an error
+
+Ensure `sentry-sdk` is installed and `sentry_dsn` exists in settings. `SENTRY_DSN` alone does not cause the container to choose the Sentry adapter. GUI toolkits may also intercept callback errors before `sys.excepthook`.

@@ -1,0 +1,127 @@
+---
+title: "Recursos"
+description: "Resolución multiplataforma, prioridades, consultas opcionales y listado."
+---
+
+# Recursos
+
+Los recursos se consultan por segmentos relativos y se devuelven como rutas absolutas.
+
+```python
+logo = context.get_resource("images", "logo.png")
+font = get_resource("fonts/Inter.ttf")
+```
+
+`ResourceQuery.from_segments()` descompone cada argumento con `Path.parts`; ambas formas anteriores producen la misma consulta conceptual.
+
+## Prioridad de raíces
+
+Si se configuró `custom_resources_dir` y existe, es la única raíz usada. De lo contrario:
+
+1. recursos extraídos del bundle protegido;
+2. recursos del bundle frozen o del proyecto source.
+
+Dentro de cada origen, el orden es específico de la plataforma antes que general:
+
+```text
+resources/windows/ o resources/win32/   # Windows
+resources/mac/ o resources/darwin/      # macOS
+resources/linux/                        # Linux
+resources/base/
+resources/
+```
+
+También se prueban equivalentes bajo `src/main/resources/`.
+
+Esto permite sobrescribir un logo únicamente en Windows:
+
+```text
+resources/
+├── base/images/logo.png
+└── windows/images/logo.png
+```
+
+En Windows, `get_resource("images", "logo.png")` devuelve la variante Windows; en otros sistemas, la base.
+
+## Source y frozen
+
+En source las raíces parten de `get_root_dir()`. En frozen parten de `get_bundle_dir()`:
+
+- PyInstaller: `sys._MEIPASS`.
+- frozen genérico en macOS: `../Resources` respecto al ejecutable si existe.
+- otros casos: directorio raíz/ejecutable.
+
+El `ResourceResult` interno indica `absolute_path`, `exists`, `is_bundled` y, cuando hay éxito, `target_os`.
+
+## Carpetas aplanadas
+
+Los bundles pueden aplanar `base/` o la carpeta de plataforma. Para conservar compatibilidad, una consulta como:
+
+```python
+get_resource("base", "images", "avatar.png")
+get_resource("windows", "icons", "app.ico")
+```
+
+prueba tanto el path completo como la variante sin el primer segmento cuando este es `base`, `windows`, `win32`, `mac`, `darwin` o `linux`.
+
+## Recurso requerido u opcional
+
+```python
+required = context.get_resource("schemas", "main.json")
+optional = context.get_resource("themes", "seasonal.qss", required=False)
+```
+
+- `required=True`: `ResolveResourceUseCase` lanza `ResourceNotFoundError` si no existe.
+- `required=False`: devuelve una ruta absoluta candidata con `exists=False` internamente; la fachada la convierte a `str`.
+
+```python
+from pathlib import Path
+
+candidate = Path(optional)
+if candidate.exists():
+    use_theme(candidate)
+```
+
+El error incluye el nombre normalizado y el padre de la ruta fallback. No contiene toda la lista real de raíces probadas.
+
+## Listar recursos
+
+La API de bajo nivel permite listar hijos inmediatos:
+
+```python
+paths = context.container.resource_adapter.list_resources("images")
+for path in paths:
+    print(path)
+```
+
+La lista:
+
+- agrega entradas de todas las raíces existentes;
+- no es recursiva;
+- puede contener archivos y directorios;
+- se deduplica mediante `set`, por lo que el orden final no está garantizado.
+
+## Raíz personalizada
+
+`ApplicationContext(custom_root=...)` cambia la raíz general. Para separar solo recursos, crea el contenedor directamente:
+
+```python
+from pathlib import Path
+from qyro import EngineContainer
+
+container = EngineContainer(
+    framework_name="headless",
+    custom_root=Path("/srv/app"),
+    custom_resources_dir=Path("/srv/shared-assets"),
+)
+
+path = container.resolve_resource_use_case.execute("logo.svg")
+```
+
+## Buenas prácticas
+
+- Usa segmentos (`"images", "logo.png"`) para expresar intención y evitar separadores dependientes del SO.
+- No construyas paths manualmente desde `cwd`; frozen puede usar una raíz diferente.
+- Coloca defaults en `resources/base` y overrides solo donde cambien.
+- Trata `required=False` como una consulta de candidato, no como garantía de existencia.
+- No guardes secretos como recursos ordinarios.

@@ -1,0 +1,141 @@
+---
+title: "Configuración"
+description: "Descubrimiento, merge, metadatos, caché y secretos en JSON."
+---
+
+# Configuración
+
+`JsonSettingsAdapter` carga configuración JSON jerárquica y produce tanto el diccionario final como `AppMetadata`.
+
+## Archivos
+
+`base.json` es el archivo que identifica una carpeta de settings. Puede complementarse con:
+
+| Plataforma | Primer nombre | Alias |
+| --- | --- | --- |
+| Windows | `windows.json` | `win32.json` |
+| macOS | `mac.json` | `darwin.json` |
+| Linux | `linux.json` | — |
+
+Solo se usa el primer archivo de plataforma existente y válido según ese orden.
+
+## Precedencia de valores
+
+La combinación es superficial y usa `dict.update()`:
+
+```text
+base.json
+   ↓ sobrescribe
+archivo de plataforma
+   ↓ sobrescribe
+secrets.json plano
+   ↓ sobrescribe
+secretos cifrados embebidos o legacy
+```
+
+Ejemplo:
+
+```json
+// base.json
+{
+  "app_name": "Example",
+  "window": {"width": 800, "height": 600},
+  "debug": false
+}
+```
+
+```json
+// windows.json
+{
+  "window": {"width": 1024},
+  "debug": true
+}
+```
+
+El resultado de `window` será `{"width": 1024}`: no conserva `height`, porque no hay merge profundo.
+
+## Búsqueda de la carpeta
+
+En source, la primera carpeta con `base.json` gana:
+
+1. `<root>/settings`
+2. `<root>/build/settings`
+3. `<root>/src/main/settings`
+4. `<root>/src/build/settings`
+5. `<root>`
+
+Si ninguna existe, se intenta el bundle protegido. En frozen, el bundle protegido se consulta antes que las rutas ordinarias del bundle.
+
+`custom_settings_dir` en `EngineContainer` reemplaza la búsqueda si el directorio existe. `ApplicationContext` no expone ese parámetro directamente.
+
+## Claves de metadatos
+
+`load_metadata()` reconoce de forma especial:
+
+| Clave | Default |
+| --- | --- |
+| `app_name` | `QyroApp` |
+| `version` | `1.0.0` |
+| `author` | `Developer` |
+| `identifier` | `com.qyro.app` |
+| `description` | cadena vacía |
+
+Todas las claves, conocidas o no, permanecen en `metadata.raw_settings` y están disponibles mediante `metadata.get(key, default)` o `context.app_settings`.
+
+Otras claves consumidas por el runtime son:
+
+- `binding` o `framework`: selección del toolkit; `binding` tiene prioridad.
+- `sentry_dsn`: activa el adaptador Sentry si `enable_sentry=True`.
+- `icon` o `app_icon`: recurso del icono; `icon` tiene prioridad.
+
+```json
+{
+  "app_name": "Inventario",
+  "version": "2.3.0",
+  "author": "Acme",
+  "identifier": "com.acme.inventario",
+  "description": "Cliente de escritorio",
+  "binding": "pyside6",
+  "icon": "icons/app.png",
+  "theme": "dark"
+}
+```
+
+## Caché y recarga
+
+`JsonSettingsAdapter.get_raw_settings()` cachea el diccionario después de la primera lectura. `LoadSettingsUseCase` mantiene además su propia caché de `AppMetadata`.
+
+```python
+metadata = container.load_settings_use_case.execute()
+metadata = container.load_settings_use_case.execute(force_reload=True)
+```
+
+`force_reload=True` reconstruye `AppMetadata`, pero el adaptador sigue devolviendo su diccionario cacheado. No existe una API pública que invalide `_cached_settings`; los archivos están pensados para configuración de arranque, no hot reload.
+
+## Secretos planos
+
+En desarrollo puede existir `secrets.json` junto a `base.json`. Si no está allí, se intenta `<root>/settings/secrets.json`. Debe contener un objeto JSON:
+
+```json
+{
+  "api_url": "https://api.example.com",
+  "api_token": "solo-desarrollo"
+}
+```
+
+No lo versiones. Los errores de lectura, JSON o tipo en el archivo plano se silencian.
+
+## Secretos cifrados
+
+El runtime prefiere `.qyro/secrets.enc` embebido dentro de `protected_resources.pak`. Como compatibilidad, también acepta el archivo cifrado externo `.qyro/secrets.json`. En ambos casos necesita un módulo compilado `runtime*.so`, `.pyd` o `.dylib` con `RUNTIME_SECRET_HEX`.
+
+El payload descifrado debe ser UTF-8, JSON y un objeto. A diferencia de los JSON ordinarios, un secreto cifrado inválido genera `ValueError`/`SecretsCryptoError`, porque continuar silenciosamente podría arrancar con credenciales incorrectas.
+
+Consulta [Recursos protegidos](/es/protected-resources) para el formato criptográfico y su modelo de seguridad.
+
+## Comportamiento ante errores
+
+- Ausencia total de settings: se devuelve `{}` y `AppMetadata` usa defaults; `SettingsNotFoundError` existe pero el adaptador actual no lo lanza.
+- JSON base/plataforma/plano inválido: se ignora silenciosamente.
+- Payload cifrado corrupto, clave incorrecta o JSON descifrado inválido: se lanza error.
+- `sentry_dsn` sin `sentry-sdk`: el arranque continúa con un warning.

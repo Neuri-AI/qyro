@@ -1,0 +1,58 @@
+---
+title: "Introduction"
+description: "What Qyro Runtime is, what it owns, and how it relates to Qyro CLI."
+---
+
+# Qyro Runtime
+
+Qyro Runtime is the layer a Python GUI application uses **while it is running**. It centralizes toolkit startup, configuration, resources, environment information, telemetry, and a reusable UI component lifecycle.
+
+<Warning>Qyro is alpha. Desktop workflows are the supported focus; mobile support remains experimental.</Warning>
+
+## Responsibilities
+
+| Area | Qyro Runtime provides |
+| --- | --- |
+| Context | `ApplicationContext`, metadata, platform, execution mode, title, icon, and the native application. |
+| Configuration | `base.json`, platform overrides, and runtime secrets. |
+| Resources | OS-aware lookup in source, frozen, and protected-bundle modes. |
+| UI | PySide6, PyQt6, PySide2, PyQt5, Kivy, Tkinter, and headless adapters. |
+| Components | A React-inspired `Component` lifecycle, props, styles, and resize hooks. |
+| Observability | Console or Sentry exception handling. |
+| At-rest protection | Loading protected resources and authenticated secrets produced by Qyro CLI. |
+
+## Out of scope
+
+Qyro Runtime does not scaffold, build, bundle, sign, notarize, or distribute applications. Those are [Qyro CLI](https://github.com/Neuri-AI/qyro-cli) responsibilities. Legacy PPG web-bridge APIs are not part of this public API either.
+
+## Startup flow
+
+The first `ApplicationContext`:
+
+1. Detects root, platform, and execution mode.
+2. Finds and merges settings.
+3. Selects telemetry.
+4. Selects the explicit, configured, or auto-detected toolkit.
+5. Validates the toolkit and creates its native application.
+6. Stores metadata and boot state in a process-wide container.
+
+```text
+ApplicationContext
+       │
+       ▼
+ EngineContainer ──► environment ─► platform / source / frozen
+       ├───────────► settings ─────► AppMetadata
+       ├───────────► resources ────► absolute paths
+       ├───────────► telemetry ────► console / Sentry
+       └───────────► framework ────► Qt / Tk / Kivy / headless
+```
+
+Most applications start with:
+
+```python
+from qyro import ApplicationContext, Component, get_resource
+```
+
+The distribution name declared in the repository is `qyro-engine`; its import package is `qyro`. The manifest supports Python `>=3.10,<3.16`, with narrower ranges for individual GUI extras.
+
+Continue with [Installation](/en/installation) and the [Quickstart](/en/quickstart).

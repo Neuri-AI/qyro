@@ -1,0 +1,90 @@
+---
+title: "Instalación"
+description: "Requisitos, extras opcionales y preparación del entorno de desarrollo."
+---
+
+# Instalación
+
+Qyro requiere Python 3.10 o superior y menor que 3.16. El paquete base instala `cryptography`; los toolkits gráficos y Sentry son extras opcionales.
+
+<Note>El nombre de distribución declarado en `pyproject.toml` es `qyro-engine`; el módulo que se importa en Python se llama `qyro`.</Note>
+
+## Desde el repositorio
+
+La forma reproducible de trabajar en este código es con Poetry:
+
+```bash
+git clone https://github.com/Neuri-AI/qyro.git
+cd qyro
+poetry install
+```
+
+Instala un toolkit concreto:
+
+```bash
+poetry install -E pyside6
+poetry install -E pyqt6
+poetry install -E pyside2
+poetry install -E pyqt5
+poetry install -E kivy
+poetry install -E sentry
+```
+
+Para instalar todos los extras declarados:
+
+```bash
+poetry install --all-extras
+```
+
+## Extras disponibles
+
+| Extra | Dependencia | Restricción adicional |
+| --- | --- | --- |
+| `pyside6` | `PySide6 >=6.5` | Python `>=3.11,<3.15` |
+| `pyqt6` | `PyQt6 >=6.5` | Python `>=3.11,<3.15` |
+| `pyside2` | `PySide2 >=5.15` | Python `<3.11` |
+| `pyqt5` | `PyQt5 >=5.15` | Python `>=3.11,<3.14` |
+| `kivy` | `kivy >=2.2` | Sin límite adicional en el manifiesto |
+| `sentry` | `sentry-sdk >=1.30` | Opcional; solo se usa si existe un DSN |
+| `all` | Todos los anteriores | La intersección de restricciones puede no ser instalable en una sola versión de Python. |
+
+El extra `all` es útil en CI o desarrollo especializado, pero las restricciones de PySide2 y Qt 6 son mutuamente incompatibles en varias versiones de Python. Para una aplicación normal conviene instalar un único binding.
+
+## Dependencias de desarrollo
+
+```bash
+poetry install --with dev -E pyside6
+poetry run pytest
+poetry run pytest --cov=qyro
+```
+
+`pytest` y `pytest-cov` pertenecen al grupo de desarrollo. Algunas pruebas del bundle protegido compilan un módulo Cython temporal; si se ejecutan en un entorno sin Cython o compilador, pueden requerir las herramientas que usa Qyro CLI.
+
+## Comprobar la instalación
+
+El modo `headless` no necesita un servidor gráfico:
+
+```bash
+poetry run python -c "from qyro import ApplicationContext; print(ApplicationContext(framework='headless').platform.value)"
+```
+
+Y para confirmar el adaptador elegido:
+
+```python
+from qyro import ApplicationContext
+
+ctx = ApplicationContext(framework="headless")
+print(ctx.container.framework_adapter.framework_name)
+print(ctx.metadata)
+```
+
+## Elegir el toolkit
+
+- Elige **PySide6** para una integración Qt 6 con licencia LGPL/comercial de Qt.
+- Elige **PyQt6** si tu proyecto ya utiliza el ecosistema Riverbank y su licencia es adecuada.
+- Usa **PySide2/PyQt5** solo si necesitas compatibilidad con Qt 5 y una versión de Python admitida.
+- Usa **Tkinter** para una interfaz pequeña sin dependencia PyPI adicional; la instalación de Python debe incluir Tcl/Tk.
+- Usa **Kivy** para interfaces táctiles o multiplataforma, teniendo en cuenta que el soporte móvil de Qyro aún es experimental.
+- Usa **headless** en tests, automatización o procesos sin interfaz.
+
+La matriz validada más reciente del repositorio está resumida en [Frameworks](/es/frameworks#matriz-validada).

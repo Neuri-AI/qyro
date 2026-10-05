@@ -1,0 +1,77 @@
+---
+title: "ApplicationContext"
+description: "Global initialization, runtime state, resources, title, icon, and event loop."
+---
+
+# ApplicationContext
+
+```python
+ApplicationContext(
+    framework: str | None = None,
+    custom_root: Path | None = None,
+    enable_sentry: bool = True,
+    argv: list[str] | None = None,
+    *args,
+    **kwargs,
+)
+```
+
+`ApplicationContext` is the main runtime facade. It can be instantiated directly or mixed into a native window.
+
+| Parameter | Purpose |
+| --- | --- |
+| `framework` | Forces `pyside6`, `pyqt6`, `pyside2`, `pyqt5`, `kivy`, `tkinter`, or `headless`. |
+| `custom_root` | Bypasses root discovery; useful in tests and embedded hosts. |
+| `enable_sentry` | Allows Sentry when merged settings contain `sentry_dsn`. |
+| `argv` | Native application arguments; Qt uses `sys.argv` when omitted. |
+| remaining arguments | Cooperatively forwarded to the next constructor in the MRO. |
+
+## Process-wide singleton
+
+The class stores one `_global_container` and `_global_boot_info`. The first context creates them; every later context reuses the same native application and adapters.
+
+<Warning>First initialization wins. A later context cannot switch framework, root, argv, or Sentry policy. Initialize the main context before creating other Qyro contexts.</Warning>
+
+During multiple inheritance, Qyro wraps the subclass constructor, attaches the engine before the native widget constructor, then applies title and icon after the widget is fully initialized. This includes safeguards for uninitialized PyQt SIP objects.
+
+## Properties
+
+| Property | Meaning |
+| --- | --- |
+| `container` | Underlying `EngineContainer`. |
+| `app` | Native `QApplication`, Tk root, Kivy app, headless app, or `None`. |
+| `metadata` / `app_settings` | Parsed `AppMetadata` and raw settings. |
+| `platform` | `PlatformType` of host OS. |
+| `execution_mode` / `is_frozen` | Source, frozen, or embedded runtime state. |
+| `window_title` | Reads/writes the adapter-aware window title. |
+| `app_icon` | Reads/resolves and assigns the application icon path. |
+
+`ExecutionMode.EMBEDDED` exists, although the current environment adapter does not emit it automatically.
+
+## Title and icon
+
+`get_default_window_title()` uses metadata `app_name`, then raw settings, then `Qyro Application`. `set_window_title(title, window=None)` tries the adapter and native Qt/Tk/Kivy conventions.
+
+The icon resolver prefers `icon` over `app_icon`, then tries platform-specific filenames. Windows prioritizes `.ico`; macOS and Linux prioritize common PNG sizes with `.icns`/`.ico` fallbacks.
+
+```python
+context.window_title = "Dashboard"
+context.app_icon = "icons/app.png"
+
+path = context.get_app_icon_path()
+applied = context.set_window_icon("icons/dialog.png", window=dialog)
+```
+
+UI operations are best-effort. A resolved icon path can still be accepted when a desktop environment chooses not to display it.
+
+## Resources and loop
+
+```python
+stylesheet = context.get_resource("styles", "dark.qss")
+optional = context.get_resource("themes", "seasonal.qss", required=False)
+exit_code = context.run()
+```
+
+`run()` delegates to the selected adapter. Qt returns its actual loop code; Kivy, Tkinter, and headless return `0`.
+
+The procedural helpers reuse this global container when it exists. Tests may reset `_global_container` and `_global_boot_info`, but that is an internal technique rather than a production API.

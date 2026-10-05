@@ -1,0 +1,107 @@
+---
+title: "Desarrollo y contribución"
+description: "Tests, publicación, convenciones y checklist para contribuir al runtime."
+---
+
+# Desarrollo y contribución
+
+## Preparar el repositorio
+
+```bash
+git clone https://github.com/Neuri-AI/qyro.git
+cd qyro
+poetry install --with dev
+poetry run pytest
+```
+
+Para trabajar con un binding:
+
+```bash
+poetry install --with dev -E pyside6
+```
+
+## Suite de tests
+
+Las pruebas actuales cubren:
+
+- decorador, props, orden de ciclo de vida, estilos y utilidades de `Component`;
+- propiedades, título, icono, recursos y delegación de `ApplicationContext`;
+- paths `base/` y plataforma aplanados en recursos frozen;
+- carga de settings/recursos desde bundle protegido;
+- secretos embebidos, legacy, manipulación y no extracción;
+- roundtrip, formato, nonces aleatorios y autenticación AES-GCM/HKDF.
+
+```bash
+poetry run pytest -q
+poetry run pytest --cov=qyro --cov-report=term-missing
+```
+
+Las pruebas de bundle compilan un módulo Cython en un directorio temporal. La dependencia no figura en el grupo dev actual, por lo que el entorno de CI/desarrollo que ejecute esas pruebas debe suministrarla junto con un compilador C.
+
+## Añadir comportamiento
+
+Mantén la dirección de dependencias:
+
+- entidades/reglas puras en `domain/`;
+- contratos en `application/ports/`;
+- orquestación en `application/use_cases/`;
+- filesystem, GUI, JSON o servicios en `adapters/`;
+- ergonomía de usuario en `client/`;
+- wiring en `container.py`.
+
+Cuando agregues un método público:
+
+1. define semántica de error y tipos;
+2. añade tests sin depender de una GUI real cuando sea posible;
+3. reexporta solo si forma parte de la superficie estable;
+4. actualiza esta documentación y el README;
+5. valida source, frozen y al menos un caso headless.
+
+## Publicación
+
+El workflow `python-publish.yml` se activa cuando se publica un GitHub Release:
+
+1. checkout;
+2. Python 3.10;
+3. instala Poetry 2.0.1;
+4. `poetry install --all-extras` en `.venv`;
+5. `poetry build`;
+6. sube `dist/` como artifact;
+7. publica en PyPI con Trusted Publishing (OIDC).
+
+Dependabot revisa semanalmente el ecosistema Poetry.
+
+<Warning>El extra `all` combina restricciones de Python incompatibles entre PySide2 y toolkits modernos. El workflow de release debe validarse cuando cambien versiones o extras.</Warning>
+
+## Versionado
+
+Actualmente existen dos valores diferentes:
+
+- `pyproject.toml`: `1.0.0a2`;
+- `qyro.__version__`: `0.1.0`.
+
+Antes de un release deben sincronizarse para evitar reportes inconsistentes.
+
+## Licencias y notices
+
+El código usa MIT. Revisa la licencia del binding GUI distribuido con tu aplicación. El archivo `NOTICE` actual está encabezado como “Qyro CLI” y describe herramientas del ecosistema; antes de publicar el runtime conviene revisarlo para asegurar que representa exactamente el artefacto distribuido.
+
+## Flujo de contribución
+
+1. Crea una rama enfocada.
+2. Escribe o actualiza tests.
+3. Ejecuta suite y cobertura.
+4. Mantén compatibilidad de imports públicos.
+5. Documenta decisiones y limitaciones.
+6. Abre un Pull Request con plataformas y bindings probados.
+
+## Checklist de revisión
+
+- ¿La primera inicialización global sigue siendo determinista?
+- ¿El cambio funciona sin toolkits opcionales instalados?
+- ¿Los imports evitan mezclar bindings Qt?
+- ¿Los paths funcionan en source y frozen?
+- ¿Los secretos nunca aparecen en logs ni en el árbol extraído?
+- ¿Un fallo de autenticación es estricto y uno visual es best-effort?
+- ¿La API de alto nivel devuelve tipos consistentes (`str` frente a `Path`)?
+- ¿Se actualizaron docs en español e inglés?

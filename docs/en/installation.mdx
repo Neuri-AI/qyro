@@ -1,0 +1,67 @@
+---
+title: "Installation"
+description: "Requirements, optional extras, and development setup."
+---
+
+# Installation
+
+Qyro requires Python 3.10 or newer and older than 3.16. The base package installs `cryptography`; GUI toolkits and Sentry are optional extras.
+
+<Note>`pyproject.toml` declares the distribution as `qyro-engine`. Python code imports the `qyro` package.</Note>
+
+## Repository setup
+
+```bash
+git clone https://github.com/Neuri-AI/qyro.git
+cd qyro
+poetry install
+```
+
+Install one GUI extra:
+
+```bash
+poetry install -E pyside6
+poetry install -E pyqt6
+poetry install -E pyside2
+poetry install -E pyqt5
+poetry install -E kivy
+poetry install -E sentry
+```
+
+Install development dependencies and run tests:
+
+```bash
+poetry install --with dev -E pyside6
+poetry run pytest
+poetry run pytest --cov=qyro
+```
+
+## Extras and Python ranges
+
+| Extra | Dependency | Additional Python constraint |
+| --- | --- | --- |
+| `pyside6` | `PySide6 >=6.5` | `>=3.11,<3.15` |
+| `pyqt6` | `PyQt6 >=6.5` | `>=3.11,<3.15` |
+| `pyside2` | `PySide2 >=5.15` | `<3.11` |
+| `pyqt5` | `PyQt5 >=5.15` | `>=3.11,<3.14` |
+| `kivy` | `kivy >=2.2` | No narrower manifest constraint |
+| `sentry` | `sentry-sdk >=1.30` | Optional |
+| `all` | Every extra | The combined constraints may not resolve on one Python version. |
+
+Prefer one binding per application. `all` is mostly useful for specialized CI, and the PySide2 range conflicts with modern Qt bindings on several Python versions.
+
+## Verify without a display
+
+```bash
+poetry run python -c "from qyro import ApplicationContext; print(ApplicationContext(framework='headless').platform.value)"
+```
+
+```python
+from qyro import ApplicationContext
+
+ctx = ApplicationContext(framework="headless")
+print(ctx.container.framework_adapter.framework_name)
+print(ctx.metadata)
+```
+
+See [Frameworks](/en/frameworks) for selection rules and compatibility notes.

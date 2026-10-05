@@ -1,0 +1,100 @@
+---
+title: "Quickstart"
+description: "Complete Qt, Tkinter, Kivy, and procedural examples."
+---
+
+# Quickstart
+
+Create a minimal project first:
+
+```text
+my-app/
+├── main.py
+├── settings/base.json
+└── resources/base/icons/app.png
+```
+
+```json
+{
+  "app_name": "My application",
+  "version": "1.0.0",
+  "binding": "pyside6",
+  "icon": "icons/app.png"
+}
+```
+
+## PySide6 / Qt
+
+```python
+import sys
+from PySide6.QtWidgets import QMainWindow, QLabel
+from qyro import ApplicationContext, Component
+
+class Window(QMainWindow, Component, ApplicationContext):
+    def component_will_mount(self):
+        self.resize(640, 480)
+
+    def render(self):
+        self.label = QLabel(
+            f"{self.window_title}\n{self.platform.value}\n{self.execution_mode.value}",
+            parent=self,
+        )
+        self.label.move(24, 24)
+
+if __name__ == "__main__":
+    window = Window()
+    window.show()
+    sys.exit(window.run())
+```
+
+`ApplicationContext` creates the global engine before the Qt window. `Component` then runs `component_will_mount`, `render`, `component_did_mount`, `set_styles`, and `on_resize`.
+
+## Tkinter
+
+```python
+import tkinter as tk
+from qyro import ApplicationContext, Component
+
+class Window(tk.Tk, Component, ApplicationContext):
+    def component_will_mount(self):
+        self.geometry("520x220")
+
+    def render(self):
+        tk.Label(self, text=f"{self.window_title} · {self.platform.value}").pack(pady=48)
+
+if __name__ == "__main__":
+    Window().run()
+```
+
+## Kivy
+
+```python
+from kivy.app import App
+from kivy.uix.label import Label
+from qyro import ApplicationContext, Component
+
+class MainApp(App, Component, ApplicationContext):
+    def render(self):
+        return Label(text=f"{self.window_title}\n{self.platform.value}")
+
+    def build(self):
+        return self.render()
+
+if __name__ == "__main__":
+    MainApp().run()
+```
+
+## Procedural helpers
+
+```python
+from pathlib import Path
+from qyro import get_resource, is_frozen, load_build_settings
+
+settings = load_build_settings()
+logo = get_resource("images", "logo.png")
+candidate = Path(get_resource("themes", "optional.qss", required=False))
+
+print(settings.get("app_name"), logo, candidate.exists(), is_frozen())
+```
+
+With `required=False`, Qyro returns an absolute candidate path even if the file does not exist.

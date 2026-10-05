@@ -1,0 +1,84 @@
+---
+title: "Components"
+description: "Component lifecycle, props, styles, resize behavior, and utilities."
+---
+
+# Components
+
+`Component` adds a React-inspired class lifecycle to Python widgets. Import it from `qyro`, `qyro.ui`, or `qyro.ui.component`.
+
+## Mixin or decorator
+
+```python
+class Card(QWidget, Component):
+    pass
+
+@Component
+class DecoratedCard(QWidget):
+    pass
+```
+
+The decorator creates a subclass of both the target and `Component`, preserving name, module, qualified name, and docstring. An existing `Component` subclass is returned unchanged.
+
+## Lifecycle order
+
+After the original constructor completes, the lifecycle mounts once:
+
+1. enable Qt styled backgrounds;
+2. `component_will_mount()`;
+3. `render()`;
+4. `component_did_mount()`;
+5. `set_styles()`;
+6. `on_resize()`.
+
+```python
+class Card(QWidget, Component):
+    STYLES = "styles/card.qss"
+
+    def component_will_mount(self):
+        self.model = load_model()
+
+    def render(self):
+        self.label = QLabel(self.props.get("title", "Untitled"), self)
+
+    def on_resize(self):
+        self.label.resize(self.calc(self.width(), 80), 32)
+```
+
+The return value of `render()` is not consumed by `Component`; a Kivy `build()` method may call and return it itself.
+
+## Props
+
+```python
+card = Card(parent=window, props={"title": "Profile", "user_id": 7})
+card = Card(parent=window, title="Profile", user_id=7)
+```
+
+`parent` is the only reserved toolkit keyword. All remaining keywords become props and override duplicate keys from the explicit dictionary.
+
+<Warning>Other native named arguments are consumed as props. Pass them positionally or handle them in your own constructor.</Warning>
+
+## Styles and resize
+
+`set_styles()` accepts an existing filesystem path, a Qyro resource path, or inline QSS. With no argument it checks `STYLES`, `CSS`, then `STYLESHEET`. It does nothing when `setStyleSheet` is unavailable.
+
+Qt binding detection enables `WA_StyledBackground` without mixing PySide/PyQt classes. A wrapped `resizeEvent` calls `on_resize()` first, then the original handler when present.
+
+## Utilities
+
+| Member | Behavior |
+| --- | --- |
+| `calc(a, b)` | `int((a * b) / 100.0)`. |
+| `find(type, name="")` | Calls `findChild`, otherwise returns `None`. |
+| `destroy_component()` | Best-effort `setParent(None)` and `deleteLater()`. |
+| `get_resource(...)` | Uses an attached or global container. |
+| `app_settings` | Final settings dictionary. |
+| `is_frozen` | Environment frozen status. |
+| `props` | Lazily created mutable dictionary. |
+
+For a root Qt window, a common MRO is:
+
+```python
+class MainWindow(QMainWindow, Component, ApplicationContext):
+    ...
+```

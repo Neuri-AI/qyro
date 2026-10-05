@@ -1,0 +1,122 @@
+---
+title: "ApplicationContext"
+description: "Inicialización global, estado del runtime, recursos, título, icono y event loop."
+---
+
+# ApplicationContext
+
+`ApplicationContext` es la fachada principal del runtime. Puede instanciarse directamente o mezclarse con una ventana nativa.
+
+```python
+ApplicationContext(
+    framework: str | None = None,
+    custom_root: Path | None = None,
+    enable_sentry: bool = True,
+    argv: list[str] | None = None,
+    *args,
+    **kwargs,
+)
+```
+
+## Parámetros
+
+| Parámetro | Predeterminado | Función |
+| --- | --- | --- |
+| `framework` | `None` | Fuerza `pyside6`, `pyqt6`, `pyside2`, `pyqt5`, `kivy`, `tkinter` o `headless`. |
+| `custom_root` | `None` | Evita el descubrimiento automático y usa esa raíz. Útil en tests y hosts embebidos. |
+| `enable_sentry` | `True` | Permite Sentry si la configuración contiene `sentry_dsn`. |
+| `argv` | `None` | Argumentos para crear la aplicación nativa. Qt usa `sys.argv` si es `None`. |
+| `*args`, `**kwargs` | — | Se pasan cooperativamente al siguiente `__init__` del MRO. |
+
+## Un único motor global
+
+`ApplicationContext` mantiene `_global_container` y `_global_boot_info` a nivel de clase. La primera instancia crea el motor; las siguientes reutilizan exactamente el mismo contenedor y aplicación nativa.
+
+<Warning>La primera inicialización gana. Si primero creas `ApplicationContext(framework="headless")`, otra instancia posterior con `framework="pyside6"` no reemplazará el adaptador. Elige framework, raíz, argumentos y Sentry antes de crear cualquier contexto o de llamar a helpers globales.</Warning>
+
+Los helpers `qyro.get_resource()`, `qyro.load_build_settings()` y `qyro.is_frozen()` reutilizan el contenedor de `ApplicationContext` cuando ya existe. Si se invocan primero, crean un contenedor procedural con autodetección.
+
+## Inicialización con herencia múltiple
+
+Al definir una subclase, Qyro envuelve su constructor mediante `__init_subclass__`:
+
+1. Adjunta el contexto y crea la aplicación nativa antes del constructor del widget.
+2. Ejecuta el `__init__` original.
+3. Aplica título e icono después de que el objeto C++/toolkit esté listo.
+
+```python
+class Window(QMainWindow, ApplicationContext):
+    def __init__(self):
+        super().__init__()
+        # self.container y QApplication ya existen aquí.
+```
+
+La implementación incluye defensas específicas contra acceso prematuro a objetos SIP de PyQt.
+
+## Propiedades
+
+| Propiedad | Tipo | Contenido |
+| --- | --- | --- |
+| `container` | `EngineContainer` | Adaptadores y casos de uso conectados. |
+| `app` | `Any` | `QApplication`, root Tk, Kivy `App`, `HeadlessApplication` o `None` según el toolkit. |
+| `metadata` | `AppMetadata` | Metadatos tipados y `raw_settings`. |
+| `app_settings` | `dict[str, Any]` | Configuración final combinada. |
+| `platform` | `PlatformType` | `windows`, `macos`, `linux`, `android`, `ios` o `unknown`. |
+| `execution_mode` | `ExecutionMode` | `source`, `pyinstaller`, `frozen_generic` o `embedded`. |
+| `is_frozen` | `bool` | `True` cuando `sys.frozen` es truthy. |
+| `window_title` | `str` | Lectura/escritura del título con fallback. |
+| `app_icon` | `str | None` | Ruta del icono detectado o asignado. |
+
+`ExecutionMode.EMBEDDED` existe en el dominio, aunque el adaptador actual no lo produce automáticamente.
+
+## Título
+
+`get_default_window_title()` toma `metadata.app_name`; si falta, intenta `raw_settings["app_name"]` y finalmente `"Qyro Application"`.
+
+```python
+window.window_title = "Panel de control"
+print(window.get_window_title())
+
+ok = window.set_window_title("Secundaria", window=other_window)
+```
+
+La asignación es best-effort: prueba el adaptador, `setWindowTitle()`, `title()` o el atributo `title`. El booleano indica si alguna estrategia funcionó.
+
+## Icono
+
+Una clave explícita `icon` o `app_icon` tiene prioridad:
+
+```json
+{"icon": "icons/app.ico"}
+```
+
+Sin clave, Qyro prueba nombres convencionales. Windows prioriza `.ico`; macOS prueba PNG de 512, 256, 128 y 1024 px antes de `.icns`; Linux prueba PNG de varios tamaños. Después usa una lista común de fallback.
+
+```python
+path = window.get_app_icon_path()
+window.app_icon = "icons/alternate.png"
+window.set_window_icon("/ruta/absoluta/icon.ico", window=dialog)
+```
+
+`set_window_icon()` devuelve `False` si no pudo resolver la ruta. Cuando existe, guarda la ruta y retorna truthy incluso si el toolkit no pudo aplicarla; el método representa principalmente una resolución válida y un intento de aplicación.
+
+## Recursos y event loop
+
+```python
+stylesheet = window.get_resource("styles", "dark.qss")
+optional = window.get_resource("images", "seasonal.png", required=False)
+exit_code = window.run()
+```
+
+`run()` delega completamente en el adaptador activo. Los adaptadores Qt devuelven el código real del event loop; Kivy, Tkinter y headless devuelven `0`.
+
+## Reiniciar estado en tests
+
+No existe una API pública de reset. La suite aislada del proyecto restablece los dos atributos de clase entre pruebas:
+
+```python
+ApplicationContext._global_container = None
+ApplicationContext._global_boot_info = None
+```
+
+Trátalo como técnica de test interna, no como operación de producción.

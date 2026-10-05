@@ -1,0 +1,49 @@
+---
+title: "Telemetry and uncaught errors"
+description: "Console and Sentry hooks, selection rules, setup, and limits."
+---
+
+# Telemetry and uncaught errors
+
+`EngineContainer` selects telemetry from merged settings:
+
+```text
+enable_sentry=True and non-empty sentry_dsn → Sentry adapter
+otherwise                                   → console adapter
+```
+
+`InitializeEngineUseCase` installs it before loading metadata and creating the native application.
+
+## Console hook
+
+`ConsoleExceptionHookAdapter` replaces `sys.excepthook` and prints a Qyro banner plus full traceback to stderr. `KeyboardInterrupt` is forwarded to the original hook. The `show_banner` argument is stored, but the current implementation always prints the banner.
+
+## Sentry
+
+```json
+{
+  "sentry_dsn": "https://public@example.ingest.sentry.io/123",
+  "version": "2.1.0"
+}
+```
+
+The adapter initializes Sentry with environment `production`, settings version as release, and `traces_sample_rate=0.2`. Missing `sentry-sdk` or initialization failures produce a warning without stopping startup.
+
+The adapter constructor can read `SENTRY_DSN`, but the container only chooses it when the settings value is already non-empty. An environment variable alone therefore does not switch the container from console to Sentry.
+
+Disable Sentry explicitly:
+
+```python
+context = ApplicationContext(enable_sentry=False)
+```
+
+First initialization still wins because the container is global.
+
+## Scope
+
+- Global exceptions reaching `sys.excepthook` are covered by the console adapter.
+- GUI toolkits may intercept callback errors separately.
+- The Sentry adapter relies on `sentry-sdk` integrations; its `install()` does not directly assign `sys.excepthook`.
+- Qyro does not add user context, logs, or custom breadcrumbs.
+
+Never put secrets into exception messages. Qyro's crypto helpers do not log plaintext or runtime keys, but application code can still leak them.

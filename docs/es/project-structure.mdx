@@ -1,0 +1,99 @@
+---
+title: "Estructura del proyecto"
+description: "Directorios reconocidos por el runtime y organización del repositorio."
+---
+
+# Estructura del proyecto
+
+Qyro acepta una estructura compacta o una jerarquía compatible con proyectos generados por Qyro CLI.
+
+## Aplicación recomendada
+
+```text
+mi-app/
+├── pyproject.toml
+├── main.py
+├── settings/
+│   ├── base.json
+│   ├── windows.json
+│   ├── mac.json
+│   ├── linux.json
+│   └── secrets.json       # solo desarrollo; no versionar
+└── resources/
+    ├── base/
+    │   ├── icons/
+    │   ├── images/
+    │   └── styles/
+    ├── windows/
+    ├── mac/
+    └── linux/
+```
+
+El archivo `pyproject.toml` ayuda a `SystemEnvironmentAdapter` a descubrir la raíz cuando se ejecuta desde código fuente. También considera como raíz el primer ancestro que contenga un directorio `src/`.
+
+## Jerarquía compatible con CLI
+
+Los adaptadores también reconocen:
+
+```text
+mi-app/
+└── src/
+    ├── main/
+    │   ├── settings/
+    │   └── resources/
+    └── build/
+        └── settings/
+```
+
+Para configuración, el orden de directorios en modo source es:
+
+1. `settings/`
+2. `build/settings/`
+3. `src/main/settings/`
+4. `src/build/settings/`
+5. la raíz del proyecto
+
+Para recursos se consultan `resources/` y `src/main/resources/`, primero sus carpetas de plataforma y después `base/` y la raíz de recursos.
+
+## Build protegido
+
+Qyro CLI puede producir:
+
+```text
+mi-app/
+└── .qyro/
+    ├── protected_resources.pak
+    └── runtime*.so | runtime*.pyd | runtime*.dylib
+```
+
+El runtime descifra el paquete en un directorio temporal, expone internamente sus carpetas `settings/` y `resources/`, y mantiene `.qyro/secrets.enc` únicamente en memoria. Consulta [Recursos protegidos](/es/protected-resources).
+
+## Estructura de este repositorio
+
+```text
+qyro/
+├── domain/               # entidades y errores sin infraestructura
+├── application/
+│   ├── ports/            # contratos abstractos
+│   └── use_cases/        # flujos de aplicación
+├── adapters/
+│   ├── environment/      # root, bundle y modo de ejecución
+│   ├── frameworks/       # Qt, Kivy, Tkinter y headless
+│   ├── platform/         # SO y entorno Linux
+│   ├── resources/        # filesystem, bundles y criptografía
+│   ├── settings/         # JSON y secretos
+│   └── telemetry/        # consola y Sentry
+├── client/               # fachadas ApplicationContext y Component
+├── ui/                   # re-export estable de Component
+├── container.py          # composition root
+└── __init__.py           # API pública y helpers procedurales
+```
+
+Fuera del paquete:
+
+- `tests/` cubre componentes, contexto, recursos y criptografía.
+- `.github/workflows/python-publish.yml` construye y publica al crear un release.
+- `.github/dependabot.yml` revisa semanalmente dependencias Poetry.
+- `pyproject.toml` define paquete, versión, dependencias y extras.
+- `README.md` presenta el proyecto y su matriz de compatibilidad.
+- `LICENSE` aplica MIT al runtime.

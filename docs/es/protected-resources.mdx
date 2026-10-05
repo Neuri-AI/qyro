@@ -1,0 +1,121 @@
+---
+title: "Recursos protegidos y secretos"
+description: "Carga de protected_resources.pak, secretos AES-GCM y modelo de seguridad."
+---
+
+# Recursos protegidos y secretos
+
+Qyro Runtime consume artefactos generados por Qyro CLI. No crea el paquete protegido: lo descubre, valida, descifra y conecta con los adaptadores existentes.
+
+<Warning>La protección cifra datos en reposo y detecta manipulación. No puede ocultar de forma absoluta un secreto a una persona capaz de ejecutar, depurar o inspeccionar el binario y la memoria del proceso.</Warning>
+
+## Artefactos esperados
+
+```text
+.qyro/
+├── protected_resources.pak
+└── runtime*.so | runtime*.pyd | runtime*.dylib
+```
+
+El módulo compilado debe exportar `RUNTIME_SECRET_HEX`, una cadena hexadecimal que represente al menos 16 bytes.
+
+## Flujo de carga
+
+1. Determina `bundle_dir` en frozen o `root_dir` en source.
+2. Busca `.qyro/protected_resources.pak` y el primer `runtime*` soportado.
+3. Calcula una cache key con ruta, tamaño y `mtime_ns` de ambos archivos.
+4. Lee el runtime secret cargando el módulo de extensión como `runtime`.
+5. Verifica y descifra el `.pak` en memoria.
+6. Lee `.qyro/secrets.enc` en memoria, sin extraerlo.
+7. Extrae settings y recursos ordinarios a un directorio temporal.
+8. Inserta esas rutas en las prioridades normales de configuración y recursos.
+
+## Formato del paquete de recursos
+
+El archivo comienza con:
+
+```text
+QYRPKG | salt(16) | wrapped_key(32) | nonce(16) | HMAC-SHA256(32) | ciphertext
+```
+
+- La clave de recursos de 32 bytes está envuelta mediante XOR con un keystream derivado de `SHA-256(runtime_secret + salt)`.
+- El contenido se cifra con un keystream por bloques basado en `SHA-256(key + nonce + counter)` y XOR.
+- El tag `HMAC-SHA256(key, nonce + ciphertext)` autentica nonce y ciphertext.
+- El plaintext resultante debe ser un ZIP válido.
+
+Este esquema es un formato interno específico de Qyro. Para secretos se usa un esquema estándar distinto.
+
+## Extracción segura desde la perspectiva del runtime
+
+La carpeta es:
+
+```text
+<temp>/qyro_protected_<16 hex del SHA-256 del paquete>/
+```
+
+Un archivo `.ok` marca una extracción completa y permite reutilizarla. El proceso mantiene cachés de clase protegidas por `threading.Lock`.
+
+Durante la extracción:
+
+- se omite `.qyro/secrets.enc`;
+- se omite cualquier entrada bajo `.qyro/`;
+- settings y recursos se extraen para que las APIs sigan devolviendo paths de filesystem.
+
+Si falta un artefacto, la firma no coincide, el formato es inválido o la extracción falla, `ProtectedResourceBundle` devuelve `None` y el runtime continúa con otras raíces. Esta tolerancia aplica al paquete general.
+
+## Formato de secretos
+
+Los secretos usan AES-256-GCM y HKDF-SHA256:
+
+```text
+QYRSEC | version | kdf_id | cipher_id | salt_len | nonce_len | salt | nonce | ciphertext+tag
+```
+
+Valores actuales:
+
+- versión `1`;
+- KDF id `1`: HKDF-SHA256;
+- cipher id `1`: AES-GCM;
+- clave derivada de 32 bytes;
+- nonce de 12 bytes;
+- info HKDF `qyro-secrets-v1`;
+- el header completo se autentica como AAD.
+
+```python
+from qyro.adapters.resources.secrets_crypto import (
+    decrypt_secrets_payload,
+    encrypt_secrets_payload,
+)
+
+runtime_secret = b"a" * 32
+encrypted = encrypt_secrets_payload(b'{"token":"abc"}', runtime_secret)
+plaintext = decrypt_secrets_payload(encrypted, runtime_secret)
+```
+
+Estas funciones son infraestructura interna; normalmente Qyro CLI cifra y el runtime descifra.
+
+## Merge de secretos
+
+El JSON descifrado debe ser un objeto. Sus claves sobrescriben settings base, plataforma y secretos planos. El merge es superficial.
+
+Compatibilidad legacy: si el bundle no contiene `.qyro/secrets.enc`, el runtime busca `.qyro/secrets.json` como payload **cifrado**, no como JSON plano.
+
+## Fallos y garantías
+
+| Situación | Resultado |
+| --- | --- |
+| Falta `.pak` o runtime module | Se ignora el origen protegido. |
+| Firma HMAC del `.pak` inválida | El paquete se descarta silenciosamente. |
+| Secretos embebidos sin runtime module | En la práctica no se puede abrir el `.pak`; no se aplican. |
+| AES-GCM tag o runtime secret incorrecto | `SecretsCryptoError` (`ValueError`). |
+| Plaintext no UTF-8/JSON/objeto | `ValueError`. |
+| Payload de secretos manipulado | AES-GCM rechaza la autenticación. |
+
+## Recomendaciones
+
+- No registres `RUNTIME_SECRET_HEX`, claves derivadas ni plaintext.
+- No versiones `settings/secrets.json`.
+- Usa credenciales de alcance mínimo y rotación frecuente.
+- Para secretos de alto valor, prefiere un backend remoto o almacén del sistema operativo y obtén tokens cortos en runtime.
+- Considera comprometidos los secretos de un cliente si un atacante controla su proceso.
+- Regenera bundle y módulo juntos; la cache key depende de ambos.

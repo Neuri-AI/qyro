@@ -1,0 +1,127 @@
+---
+title: "API reference"
+description: "Complete reference for public symbols, domain objects, ports, use cases, and adapters."
+---
+
+# API reference
+
+Imports from `qyro` are the primary public surface:
+
+```python
+from qyro import (
+    ApplicationContext, Component, EngineContainer,
+    PlatformDetector, PlatformType, ExecutionMode, AppMetadata,
+    QyroEngineError, ResourceNotFoundError,
+    SettingsNotFoundError, FrameworkNotAvailableError,
+    get_resource, load_build_settings, is_frozen,
+)
+```
+
+## Top-level helpers
+
+- `get_resource(*segments: str, required: bool = True) -> str`
+- `load_build_settings() -> dict`
+- `is_frozen() -> bool`
+
+All use a module-level container and reuse `ApplicationContext`'s container after one exists.
+
+`qyro.__version__` is currently `0.1.0`, while `pyproject.toml` declares `1.0.0a2`. Consumers needing installed-distribution metadata should query package metadata until these are synchronized.
+
+## `ApplicationContext`
+
+See the [full guide](/en/application-context).
+
+| Member | Type/signature |
+| --- | --- |
+| `container` | `EngineContainer` |
+| `app` | `Any` |
+| `metadata` | `AppMetadata` |
+| `app_settings` | `dict[str, Any]` |
+| `is_frozen` | `bool` |
+| `platform` | `PlatformType` |
+| `execution_mode` | `ExecutionMode` |
+| `window_title` | read/write `str` |
+| `app_icon` | read/write `str | None` |
+| `get_default_window_title()` | `str` |
+| `get_window_title()` | `str` |
+| `set_window_title(title, window=None)` | `bool` |
+| `get_app_icon_path()` | `str | None` |
+| `set_window_icon(path, window=None)` | `bool` |
+| `get_resource(*segments, required=True)` | `str` |
+| `run()` | `int` |
+
+## `Component`
+
+See [Components](/en/components). Hooks are `component_will_mount`, `render`, `component_did_mount`, `set_styles`, and `on_resize`. Utilities include `resizeEvent`, `destroy_component`, `find`, `calc`, `get_resource`, `app_settings`, `is_frozen`, and `props`.
+
+## `EngineContainer`
+
+```python
+EngineContainer(
+    framework_name: str | None = None,
+    custom_root: Path | None = None,
+    custom_resources_dir: Path | None = None,
+    custom_settings_dir: Path | None = None,
+    enable_sentry: bool = True,
+)
+```
+
+It exposes `env_adapter`, `settings_adapter`, `resource_adapter`, `telemetry_adapter`, `framework_adapter`, `resolve_resource_use_case`, `load_settings_use_case`, and `initialize_engine_use_case`.
+
+## Domain objects
+
+### `PlatformType`
+
+String enum values: `WINDOWS`, `MACOS`, `LINUX`, `ANDROID`, `IOS`, `UNKNOWN`. `is_desktop` covers the first three; `is_mobile` covers Android/iOS.
+
+### `ExecutionMode`
+
+`SOURCE`, `FROZEN_PYINSTALLER`, `FROZEN_GENERIC`, `EMBEDDED`.
+
+### `ResourceQuery`
+
+Frozen dataclass with `relative_path_segments`. `from_segments()` splits using `Path.parts`; `as_posix()` joins with `/`.
+
+### `ResourceResult`
+
+Frozen dataclass: `absolute_path: Path`, `exists: bool`, `is_bundled: bool`, and optional `target_os`.
+
+### `AppMetadata`
+
+Fields: `app_name`, `version`, `author`, `identifier`, `description`, and `raw_settings`. `get()` delegates to the raw dictionary; `default()` builds fallback metadata.
+
+Dataclass defaults, `default()`, and JSON-adapter defaults are not identical. Normal callers should use context metadata.
+
+## Errors
+
+| Error | Meaning |
+| --- | --- |
+| `QyroEngineError` | Base with `message` and optional `details`. |
+| `ResourceNotFoundError` | Required resource miss; includes resource name/search paths. |
+| `SettingsNotFoundError` | Reserved; current JSON adapter does not raise it. |
+| `FrameworkNotAvailableError` | Unknown or unavailable toolkit. |
+| `PlatformUnsupportedError` | Exported from `qyro.domain`, not top-level `qyro`. |
+| `SecretsCryptoError` | Internal `ValueError` subclass for secret format/authentication. |
+
+## `PlatformDetector`
+
+`get_platform`, `is_windows`, `is_mac`, `is_linux`, `is_ubuntu`, `is_fedora`, `is_arch`, `is_gnome`, and `is_kde`. Linux distro detection reads `/etc/os-release`; desktop detection reads `XDG_CURRENT_DESKTOP`.
+
+## Use cases
+
+- `ResolveResourceUseCase(resource_port).execute(*segments, required=True) -> Path`
+- `LoadSettingsUseCase(settings_port).execute(force_reload=False) -> AppMetadata`
+- `LoadSettingsUseCase.get_setting(key, default=None) -> Any`
+- `InitializeEngineUseCase(...).execute(argv=None) -> dict[str, Any]`
+
+## Port contracts
+
+- `IEnvironmentPort`: frozen, execution mode, platform, root, bundle.
+- `IResourcePort`: `resolve()` and `list_resources()`.
+- `ISettingsPort`: `load_metadata()` and `get_raw_settings()`.
+- `ITelemetryPort`: `install()` and `handle_exception()`.
+- `IUIFrameworkPort`: name, availability, create/run/exit, icon/title methods.
+
+## Advanced/internal adapters
+
+The package also exposes modules for `SystemEnvironmentAdapter`, `JsonSettingsAdapter`, `FileSystemResourceAdapter`, `FrameworkFactory`, console/Sentry hooks, `ProtectedResourceBundle`, runtime-secret loading, and secret crypto. These are not top-level exports and may evolve more freely.
