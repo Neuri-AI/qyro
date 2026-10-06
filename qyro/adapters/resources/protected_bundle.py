@@ -8,6 +8,7 @@ paths without changing existing public APIs.
 
 from __future__ import annotations
 
+import atexit
 import hashlib
 import hmac
 import io
@@ -135,6 +136,7 @@ class ProtectedResourceBundle:
             shutil.rmtree(extract_root, ignore_errors=True)
             raise
 
+        atexit.register(shutil.rmtree, extract_root, ignore_errors=True)
         return extract_root, encrypted_secrets_payload
 
     @classmethod

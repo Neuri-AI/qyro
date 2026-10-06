@@ -149,6 +149,28 @@ def test_protected_bundle_does_not_trust_precreated_legacy_temp_directory(tmp_pa
         shutil.rmtree(attacker_root, ignore_errors=True)
 
 
+def test_protected_bundle_registers_cleanup_for_extracted_directory(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _write_protected_package(tmp_path)
+    registered: list[tuple[object, tuple[object, ...], dict[str, object]]] = []
+
+    def fake_register(callback, *args, **kwargs):
+        registered.append((callback, args, kwargs))
+
+    monkeypatch.setattr(
+        "qyro.adapters.resources.protected_bundle.atexit.register",
+        fake_register,
+    )
+
+    env = SystemEnvironmentAdapter(custom_root=tmp_path)
+    extracted_root = ProtectedResourceBundle.get_extracted_root(env)
+
+    assert extracted_root is not None
+    assert registered == [(shutil.rmtree, (extracted_root,), {"ignore_errors": True})]
+
+
 def test_json_settings_adapter_does_not_load_sign_profile(tmp_path: Path) -> None:
     settings_dir = tmp_path / "settings"
     settings_dir.mkdir()
