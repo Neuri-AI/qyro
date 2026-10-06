@@ -35,6 +35,7 @@ Qyro currently provides:
 - Automatic settings loading from JSON files.
 - Resource resolution that works in source mode and frozen mode.
 - A component lifecycle mixin for UI classes with flexible property handling.
+- Runtime loading of encrypted secrets payloads (AES-256-GCM + HKDF-SHA256) embedded inside `protected_resources.pak` when present.
 
 ## What it is not
 
@@ -109,37 +110,49 @@ framework, dependency state, and CI environment used during testing.
 
 ## Installation
 
-This package is configured with Poetry extras.
+The distribution name declared by this repository is `qyro-engine`; the Python
+package imported by applications is `qyro`. The project is configured with
+Poetry extras. From a repository checkout:
+
+Install Poetry in an isolated environment with pipx, then verify it:
+
+```bash
+pipx install poetry
+poetry --version
+```
+
+See the [official Poetry installation guide](https://python-poetry.org/docs/)
+for its macOS, Linux, WSL, and Windows installers.
 
 Base package:
 
 ```bash
-poetry add qyro
+poetry install
 
 ```
 
 With specific GUI stack:
 
 ```bash
-poetry add qyro -E pyside6
-poetry add qyro -E pyqt6
-poetry add qyro -E pyside2
-poetry add qyro -E pyqt5
-poetry add qyro -E kivy
+poetry install -E pyside6
+poetry install -E pyqt6
+poetry install -E pyside2
+poetry install -E pyqt5
+poetry install -E kivy
 
 ```
 
 With telemetry helper:
 
 ```bash
-poetry add qyro -E sentry
+poetry install -E sentry
 
 ```
 
 Everything enabled:
 
 ```bash
-poetry add qyro -E all
+poetry install --all-extras
 
 ```
 
@@ -156,7 +169,9 @@ my-app/
 │  ├─ base.json
 │  ├─ windows.json
 │  ├─ mac.json
-│  └─ linux.json
+│  ├─ linux.json
+│  ├─ sign.json          # CLI-only signing/notarization; never bundled
+│  └─ secrets.json       # API keys, tokens, and protected app data
 └─ resources/
    ├─ base/
    ├─ windows/
@@ -164,6 +179,25 @@ my-app/
    └─ linux/
 
 ```
+
+During a frozen build, Qyro CLI excludes the plaintext `secrets.json`, encrypts
+the complete object, and packages it for the Engine to load at runtime:
+
+```text
+my-app/
+└─ .qyro/
+    ├─ protected_resources.pak
+    ├─ runtime*.so|runtime*.pyd
+
+```
+
+`sign.json` is a separate local-only Qyro CLI profile. The Engine does not load
+it, and Qyro CLI excludes it from ordinary and protected build resources.
+
+Application code reads the resulting API keys, tokens, and protected values
+through `app_settings` in both source and frozen modes. Encryption protects
+embedded secrets at rest, but values necessarily become available in process
+memory when the application uses them.
 
 ## Qyro Settings Builder
 
@@ -421,6 +455,14 @@ Utility methods:
 * Framework adapters: qyro/adapters/frameworks/
 * Resource resolver: qyro/adapters/resources/filesystem_resources.py
 * Settings loader: qyro/adapters/settings/json_settings.py
+
+## Full documentation
+
+The complete bilingual documentation lives in [`docs/`](docs/). It covers
+installation, project layout, application and component lifecycles, settings
+precedence, resource lookup, every framework adapter, telemetry, protected
+resources and secrets, internal architecture, the full API, troubleshooting,
+and contributor workflows.
 
 ## 🤝 Contributing
 

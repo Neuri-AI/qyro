@@ -7,6 +7,7 @@ from pathlib import Path
 
 from qyro.application.ports.environment import IEnvironmentPort
 from qyro.application.ports.resources import IResourcePort
+from qyro.adapters.resources.protected_bundle import ProtectedResourceBundle
 from qyro.domain.entities import PlatformType, ResourceQuery, ResourceResult
 
 
@@ -36,6 +37,17 @@ class FileSystemResourceAdapter(IResourcePort):
         os_dirs = platform_subdir_map.get(platform, [])
 
         candidates: list[Path] = []
+
+        protected_root = ProtectedResourceBundle.get_extracted_root(self._env)
+        if protected_root:
+            protected_resources = protected_root / "resources"
+            if protected_resources.exists():
+                for os_sub in os_dirs:
+                    candidates.append(protected_resources / os_sub)
+                candidates.extend([
+                    protected_resources / "base",
+                    protected_resources,
+                ])
 
         if self._env.is_frozen():
             bundle = self._env.get_bundle_dir()
@@ -82,17 +94,19 @@ class FileSystemResourceAdapter(IResourcePort):
     def resolve(self, query: ResourceQuery) -> ResourceResult:
         """Resolve a resource query to its absolute filesystem path."""
         rel_path = Path(*query.relative_path_segments)
+        rel_candidates = self._candidate_relative_paths(rel_path)
         candidates = self._get_candidate_roots()
 
         for root in candidates:
-            target = root / rel_path
-            if target.exists():
-                return ResourceResult(
-                    absolute_path=target.resolve(),
-                    exists=True,
-                    is_bundled=self._env.is_frozen(),
-                    target_os=self._env.get_platform(),
-                )
+            for rel in rel_candidates:
+                target = root / rel
+                if target.exists():
+                    return ResourceResult(
+                        absolute_path=target.resolve(),
+                        exists=True,
+                        is_bundled=self._env.is_frozen(),
+                        target_os=self._env.get_platform(),
+                    )
 
         primary_root = (
             candidates[0] if candidates else self._env.get_root_dir()
@@ -104,6 +118,25 @@ class FileSystemResourceAdapter(IResourcePort):
             exists=False,
             is_bundled=self._env.is_frozen(),
         )
+
+    def _candidate_relative_paths(self, rel_path: Path) -> list[Path]:
+        """Generate path variants for frozen bundles that flatten base/platform folders."""
+        alternatives: list[Path] = [rel_path]
+        parts = list(rel_path.parts)
+
+        if len(parts) < 2:
+            return alternatives
+
+        first = parts[0].lower()
+        aliases = {"base", "windows", "win32", "mac", "darwin", "linux"}
+        if first in aliases:
+            alternatives.append(Path(*parts[1:]))
+
+        unique: list[Path] = []
+        for item in alternatives:
+            if item not in unique:
+                unique.append(item)
+        return unique
 
     def list_resources(self, subdirectory: str = "") -> list[Path]:
         """List resources contained in the specified subdirectory."""

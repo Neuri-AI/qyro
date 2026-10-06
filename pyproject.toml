@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "qyro-engine"
-version = "1.0.0a1"
+version = "1.0.0a2"
 description = "Qyro Engine is the runtime engine for the Qyro ecosystem, providing the foundation for building and running Python applications across desktop and mobile platforms."
 authors = ["Qyro Team"]
 license = "MIT"
@@ -9,6 +9,7 @@ packages = [{include = "qyro"}]
 
 [tool.poetry.dependencies]
 python = ">=3.10,<3.16"
+cryptography = ">=45.0.0,<47.0.0"
 
 PySide6 = {version = ">=6.5.0", optional = true, python = ">=3.11,<3.15"}
 PyQt6 = {version = ">=6.5.0", optional = true, python = ">=3.11,<3.15"}
@@ -29,6 +30,7 @@ all = ["PySide6", "PyQt6", "PySide2", "PyQt5", "kivy", "sentry-sdk"]
 [tool.poetry.group.dev.dependencies]
 pytest = ">=8.0.0"
 pytest-cov = ">=4.1.0"
+cython = ">=3.0.12,<4.0.0"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
