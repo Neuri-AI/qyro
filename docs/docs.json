@@ -1,0 +1,123 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "Qyro Runtime",
+  "description": "Runtime multiplataforma, contexto de aplicación, recursos, configuración y ciclo de vida para interfaces Python.",
+  "logo": {
+    "light": "https://ik.imagekit.io/kummiktgaiq/ppg/qyro%20logo%20alt_2CvgPgROT.svg",
+    "dark": "https://ik.imagekit.io/kummiktgaiq/ppg/qyro%20logo%20_SqGzJHuQM.svg",
+    "href": "#"
+  },
+  "colors": {
+    "primary": "#EA580C",
+    "light": "#EA580C",
+    "dark": "#EA580C"
+  },
+  "navigation": {
+    "languages": [
+      {
+        "language": "es",
+        "groups": [
+          {
+            "group": "Fundamentos de Qyro",
+            "pages": [
+              "es/index"
+            ]
+          },
+          {
+            "group": "Qyro CLI",
+            "pages": [
+              "es/cli",
+              "es/installation",
+              "es/quickstart",
+              "es/project-structure",
+              "es/configuration-files",
+              "es/tooling"
+            ]
+          },
+          {
+            "group": "Qyro Engine",
+            "pages": [
+              "es/engine",
+              "es/application-context",
+              "es/components",
+              "es/settings",
+              "es/resources",
+              "es/source-frozen",
+              "es/frameworks",
+              {
+                "group": "Frameworks",
+                "pages": [
+                  "es/frameworks/pyside6",
+                  "es/frameworks/pyqt6",
+                  "es/frameworks/pyqt5",
+                  "es/frameworks/pyside2",
+                  "es/frameworks/tkinter",
+                  "es/frameworks/kivy"
+                ]
+              },
+              "es/secrets",
+              "es/protected-resources",
+              "es/telemetry"
+            ]
+          },
+          {
+            "group": "Pydux: integración opcional",
+            "pages": [
+              "es/pydux"
+            ]
+          },
+          {
+            "group": "Demos",
+            "pages": [
+              "es/examples"
+            ]
+          },
+          {
+            "group": "Consulta y mantenimiento",
+            "pages": [
+              "es/architecture",
+              "es/api-reference",
+              "es/compatibility",
+              "es/troubleshooting"
+            ]
+          }
+        ]
+      },
+      {
+        "language": "en",
+        "groups": [
+          {
+            "group": "Getting started",
+            "pages": [
+              "en/index",
+              "en/installation",
+              "en/quickstart",
+              "en/project-structure"
+            ]
+          },
+          {
+            "group": "Runtime guides",
+            "pages": [
+              "en/application-context",
+              "en/components",
+              "en/settings",
+              "en/resources",
+              "en/frameworks",
+              "en/telemetry",
+              "en/protected-resources"
+            ]
+          },
+          {
+            "group": "Architecture and reference",
+            "pages": [
+              "en/architecture",
+              "en/api-reference",
+              "en/troubleshooting"
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

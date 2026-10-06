@@ -1,0 +1,179 @@
+---
+title: "Instalación"
+description: "Crear un entorno Python e instalar Qyro CLI y PySide6 con pip o Poetry."
+---
+
+# Instalación
+
+En esta página prepararás un entorno aislado e instalarás las herramientas para crear una aplicación con Qyro CLI y PySide6. Un **entorno** separa el intérprete y las dependencias de este proyecto de las de otros proyectos.
+
+Utiliza **Python 3.13** para seguir este recorrido. El Engine admite un rango más amplio, pero cada binding tiene sus propios requisitos. Puedes preparar el entorno con `venv` o `conda`; elige una de las dos opciones siguientes.
+
+## 1. Crear y activar el entorno
+
+### Con venv
+
+Necesitas Python 3.13 instalado. Desde tu carpeta de trabajo, crea el entorno:
+
+```bash
+python -m venv .venv
+```
+
+`venv` crea `.venv/` con un intérprete y espacio propio para instalar paquetes. Actívalo según tu terminal.
+
+En **Windows PowerShell**:
+
+```bash
+.\.venv\Scripts\Activate.ps1
+```
+
+En **Windows CMD**:
+
+```bash
+.venv\Scripts\activate.bat
+```
+
+En **macOS o Linux**:
+
+```bash
+source .venv/bin/activate
+```
+
+La activación hace que `python`, `pip` y los comandos instalados correspondan al entorno. Para salir después, utiliza `deactivate`.
+
+### Con Conda
+
+Si utilizas Conda, crea y activa un entorno:
+
+```bash
+conda create --name qyro-app python=3.13 -y
+conda activate qyro-app
+```
+
+La primera orden crea el entorno `qyro-app` con Python y pip; `-y` acepta la confirmación. La segunda lo activa. Puedes elegir otro nombre. Para salir después, utiliza `conda deactivate`.
+
+### Confirmar el intérprete
+
+Con el entorno activo:
+
+```bash
+python --version
+pip install --upgrade pip
+```
+
+Comprueba que la versión sea la que elegiste. La segunda orden actualiza pip dentro de ese entorno. Usaremos `pip` para que las instalaciones correspondan al intérprete activo.
+
+## 2. Instalar Qyro para PySide6
+
+Puedes instalar las dependencias con pip o administrarlas con Poetry. Elige una
+de las dos alternativas; no necesitas ejecutar ambas.
+
+### Con pip
+
+```bash
+pip install --pre "qyro-cli[desktop]" "qyro-engine[pyside6]"
+```
+
+Esta orden instala desde el índice de paquetes:
+
+- **`qyro-cli[desktop]`:** el comando `qyro` y herramientas de escritorio, incluidas PyInstaller, Pillow y Cython.
+- **`qyro-engine[pyside6]`:** el motor importable como `qyro` y el binding PySide6 con el que escribirás la interfaz.
+- **`--pre`:** permite seleccionar las versiones preliminares de los paquetes, actualmente en alpha.
+
+Los corchetes indican un **extra**: un grupo de dependencias opcionales. `desktop` añade herramientas de build al CLI; `pyside6` añade un toolkit al Engine. Son extras de paquetes distintos.
+
+El desarrollo normal no necesita compilar el Engine. Para ejecutar `qyro build` sí necesitas un compilador C compatible con el Python del entorno, porque el CLI compila su módulo runtime mediante Cython. Los requisitos de build se explican en [Build y distribución](/es/tooling).
+
+### Con Poetry
+
+[Poetry](https://python-poetry.org/) administra dependencias, crea un
+`poetry.lock` reproducible y ejecuta comandos dentro del entorno del proyecto.
+Instala Poetry de forma aislada, no como dependencia del mismo entorno que va a
+administrar.
+
+Si ya tienes [pipx](https://pipx.pypa.io/) instalado, esta es la opción
+recomendada:
+
+```bash
+pipx install poetry
+```
+
+También puedes utilizar el instalador oficial. En **macOS, Linux o WSL**:
+
+```bash
+curl -sSL https://install.python-poetry.org | python3 -
+```
+
+En **Windows PowerShell**:
+
+```powershell
+(Invoke-WebRequest -Uri https://install.python-poetry.org -UseBasicParsing).Content | py -
+```
+
+Cierra y abre la terminal si el instalador modificó el `PATH`, y comprueba la
+instalación:
+
+```bash
+poetry --version
+```
+
+Si quieres que Poetry cree `.venv/` dentro del proyecto, no mantengas activo un
+entorno externo al ejecutar los siguientes comandos. Dentro de la carpeta de tu
+aplicación, inicializa el manifiesto, configura el entorno e instala Qyro:
+
+```bash
+poetry init -n
+poetry config virtualenvs.in-project true --local
+poetry add --allow-prereleases "qyro-cli[desktop]" "qyro-engine[pyside6]"
+```
+
+Si activaste previamente un entorno `venv` o Conda, Poetry lo detecta y lo
+utiliza en lugar de crear `.venv/`. Sin un entorno activo, crea uno aislado
+automáticamente según la configuración anterior.
+
+Ejecuta los comandos del proyecto con `poetry run`:
+
+```bash
+poetry run qyro --help
+poetry run python -c "from qyro import ApplicationContext; print('Qyro disponible')"
+```
+
+## 3. Comprobar la instalación
+
+```bash
+qyro --help
+qyro version
+python -c "from qyro import ApplicationContext; from PySide6.QtWidgets import QApplication; print('Qyro y PySide6 disponibles')"
+```
+
+La ayuda comprueba el comando; `version` muestra los paquetes detectados; la última orden comprueba los imports para la primera aplicación. Si la terminal no encuentra `qyro`, confirma que el entorno esté activo y prueba `python -m qyro_cli --help`.
+
+## Otros bindings
+
+Puedes mantener el CLI e instalar el extra del Engine que corresponda a tu aplicación. Por ejemplo:
+
+```bash
+pip install --pre "qyro-engine[pyqt6]"
+```
+
+| Extra del Engine | Dependencia | Rango adicional del manifest auditado |
+| --- | --- | --- |
+| `pyside6` | PySide6 | Python `>=3.10,<3.15` |
+| `pyqt6` | PyQt6 | Python `>=3.10,<3.15` |
+| `pyqt5` | PyQt5 | Python `>=3.10,<3.14` |
+| `pyside2` | PySide2 | Python 3.10 al combinarse con el rango del Engine |
+| `kivy` | Kivy | Sin marcador adicional de Python |
+| `sentry` | sentry-sdk | Sin marcador adicional de Python |
+| `all` | Todos los grupos opcionales anteriores | Se aplican los marcadores de cada dependencia |
+
+Tkinter depende de Tcl/Tk disponible en tu instalación de Python y no requiere un extra del Engine.
+
+### Instalar todos los extras
+
+```bash
+pip install --pre "qyro-engine[all]"
+```
+
+`all` solicita **todos los extras del Engine**: PySide6, PyQt6, PyQt5, PySide2, Kivy y Sentry. Pip descarga e instala los que correspondan a la versión de Python del entorno según sus marcadores. Por ejemplo, en Python 3.13 el marcador de PySide2 lo excluye. No incluye el CLI ni librerías independientes de estado. Para desarrollar la primera aplicación basta con `pyside6`.
+
+Continúa con [Tu primera aplicación](/es/quickstart), que utiliza el CLI para generar y ejecutar el proyecto.

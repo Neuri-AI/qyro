@@ -1,0 +1,773 @@
+---
+title: "Archivos de configuración del CLI"
+description: "Referencia completa de base.json, perfiles de plataforma, build.json, release.json, sign.json y secrets.json."
+---
+
+# Archivos de configuración del CLI
+
+Esta página describe las opciones que Qyro CLI interpreta al ejecutar `start`, `build`, `bundle` y `sign`. También aclara cuáles llegan al Qyro Engine durante la ejecución y cuáles existen únicamente para el tooling.
+
+<Tip>
+  La forma más sencilla de empezar es [Qyro Settings Builder](https://qyro-settings-builder.up.railway.app/). Utiliza su interfaz para preparar `base.json`, los perfiles de plataforma y `release.json`; guarda los archivos exportados en `settings/` y revísalos antes del build. Crea localmente `secrets.json` para datos protegidos que utiliza la aplicación y `sign.json` para firma/notarización. Mantén ambos fuera del control de versiones.
+</Tip>
+
+## Mapa de archivos
+
+```text
+mi-app/
+├── build.json                 # override opcional exclusivo de qyro build
+└── settings/
+    ├── base.json              # identidad, entry point y valores comunes
+    ├── windows.json           # opciones de build para Windows
+    ├── linux.json             # opciones de build para Linux
+    ├── mac.json               # opciones de build para macOS
+    ├── release.json           # build de release, protección y bundle
+    ├── sign.json              # firma/notarización local; nunca se empaqueta
+    └── secrets.json           # datos protegidos de runtime; nunca se versiona
+```
+
+| Archivo | Consumidor principal | Propósito |
+| --- | --- | --- |
+| `base.json` | CLI y Engine | Valores comunes de la aplicación. |
+| `windows.json`, `linux.json`, `mac.json` | CLI; el Engine lee el archivo de su host | Diferencias por sistema operativo. |
+| `build.json` | Solo `qyro build` | Override específico de una invocación o proyecto de build. |
+| `release.json` | `qyro build`, `bundle` y `sign` | Perfil de entrega, empaquetado y protección. |
+| `sign.json` | Solo `qyro sign` | Certificados, identidades y credenciales de firma/notarización. Se excluye de los builds. |
+| `secrets.json` | CLI y Engine | Claves de API y otros datos protegidos que necesita la aplicación en runtime. |
+
+<Warning>
+  El Engine conserva claves desconocidas en `context.app_settings`, pero eso no significa que las ejecute. `optimization`, `bundle`, `sign`, `uac` y `resource_protection` son opciones del CLI. Del mismo modo, `debug` no activa por sí solo el modo debug de tu código de aplicación.
+</Warning>
+
+## Precedencia y merge
+
+El CLI hace **merge profundo** de objetos: conserva las claves anidadas que no hayan sido reemplazadas. Las listas y los valores simples se sustituyen. La regla más importante es sencilla: **el archivo cargado al final tiene prioridad**.
+
+| Comando | Orden de carga, de menor a mayor prioridad |
+| --- | --- |
+| `qyro start` | El CLI usa `base.json` → `secrets.json` para localizar el binding y el entry point. Dentro de la app, el Engine vuelve a cargar `base.json` → perfil de plataforma → `secrets.json`. |
+| `qyro build` | `base.json` → perfil de plataforma → perfil elegido (`release` por defecto) → `secrets.json` → `build.json` → opciones del comando. |
+| `qyro bundle` | `base.json` → `release.json` → `secrets.json` → opciones del comando. |
+| `qyro sign` | `base.json` → `release.json` → `sign.json` → opciones del comando. `secrets.json` sigue presente como configuración de aplicación, pero no debe contener claves de firma. |
+
+Ejemplo: si `windows.json` define `"bundle_mode": "onedir"` y `release.json` cambia el valor a `"onefile"`, el build de release usa `onefile`. Si `secrets.json` sobrescribe una clave anterior, gana `secrets.json`.
+
+### Nombres de plataforma y perfiles
+
+Para proyectos nuevos utiliza estos nombres:
+
+| Plataforma | Archivo recomendado | Nombres de perfil compatibles |
+| --- | --- | --- |
+| Windows | `windows.json` | `windows`, `win32`, `win` |
+| Linux | `linux.json` | `linux`, `linux2`, `gnu` |
+| macOS | `mac.json` | `mac`, `macos`, `darwin`, `osx` |
+
+`macos.json` se conserva como alias compatible; si existen `macos.json` y `mac.json`, este último tiene prioridad. También puedes crear un perfil propio, por ejemplo `staging.json`, y seleccionarlo con `qyro build --profile staging`.
+
+<Note>
+  En Windows no necesitas duplicar la configuración de release dentro de `windows.json`. Guarda las diferencias propias de Windows en `windows.json`, las opciones de entrega en `release.json`, la firma en `sign.json` y los secretos de runtime en `secrets.json`.
+</Note>
+
+El Engine usa otra regla y hace un **merge superficial**:
+
+| Modo | Secretos utilizados |
+| --- | --- |
+| Desarrollo/source | Lee el archivo plano `settings/secrets.json`. |
+| Aplicación frozen | Lee y descifra en memoria el payload cifrado generado por `qyro build`. |
+| Ambos disponibles | Aplica primero el archivo plano y después el payload cifrado; los valores cifrados tienen prioridad. |
+
+El orden completo del Engine es `base.json` → primer perfil válido de la plataforma → secretos planos → secretos cifrados. Como el merge es superficial, si sobrescribes un objeto anidado en un perfil o en `secrets.json`, repite el objeto completo. Consulta [Configuración del Engine](/es/settings).
+
+Los JSON inválidos o cuyo nivel superior no sea un objeto se ignoran silenciosamente al cargar perfiles del CLI. Valida los archivos antes de una entrega; no confíes en ese silencio como mecanismo de fallback.
+
+## `base.json`
+
+Ejemplo completo:
+
+```json
+{
+  "app_name": "MyApp",
+  "author": "Ejemplo",
+  "entry_point": "main.py",
+  "addons": [],
+  "version": "1.0.0",
+  "binding": "PySide6",
+  "icon": "resources/custom/app.ico",
+  "hidden_imports": [
+    "__future__",
+    "PySide6.QtCore",
+    "PySide6.QtGui",
+    "PySide6.QtWidgets"
+  ]
+}
+```
+
+La ruta de `icon` es un ejemplo. Cámbiala si tu icono se encuentra en otra ubicación.
+
+### Identidad y arranque
+
+| Clave | Tipo | Default de build | Significado |
+| --- | --- | --- | --- |
+| `app_name` | string no vacío | nombre de la carpeta | Nombre del ejecutable, bundle y metadatos. El Engine lo usa también como nombre visible. |
+| `author` | string | `Developer` | Autor o editor. Se usa para metadatos y para sugerir un bundle ID de macOS. |
+| `version` | string | `1.0.0` | Versión usada en nombres y paquetes. El build no exige SemVer, aunque es la convención recomendada. |
+| `entry_point` | ruta string | `main.py` | Script Python de entrada, relativo a la raíz salvo que sea absoluto. `qyro start` exige que exista. |
+| `binding` | string | `PySide6` | Toolkit: `PySide6`, `PyQt6`, `PyQt5`, `PySide2`, `Kivy` o `Tkinter`; no distingue mayúsculas al parsear. |
+| `icon` | ruta string | sin icono explícito | Icono enviado a PyInstaller. El CLI de build no usa `app_icon` como alias, aunque el Engine sí lo reconoce. |
+| `freeze_dir` | ruta string | `build` | Carpeta que `clean`, `bundle`, `sign` y sus guards buscan. El freezer actual escribe siempre en `build`; no cambies este valor hasta que ambas rutas estén conectadas. |
+| `identifier` | string | `com.qyro.app` en Engine | Metadato del Engine. Para el `.app` usa `mac_bundle_identifier`. |
+| `description` | string | vacío en Engine | Metadato disponible para tu aplicación; el empaquetador actual no lo incorpora automáticamente. |
+
+`qyro start` necesita `binding` y `entry_point` en los settings cargados. `qyro build` sí aplica los defaults de la tabla, por lo que un archivo incompleto podría construir pero no arrancar mediante `qyro start`.
+
+### Imports, addons y datos personalizados
+
+| Clave | Tipo | Efecto |
+| --- | --- | --- |
+| `hidden_imports` | lista de strings | Añade un `--hidden-import` por módulo. Úsalo para imports dinámicos que PyInstaller no detecta. |
+| `addons` | lista | La plantilla guarda los addons elegidos y el Engine puede exponer el valor. En el build actual no se copia al `FreezeManifest`, por lo que no activa hooks adicionales por sí solo. |
+| cualquier otra clave | cualquier JSON | El Engine la conserva en `context.app_settings`; el CLI la ignora si ningún caso de uso la reconoce. |
+
+Los hooks de framework ya incluyen los módulos esenciales del binding activo y excluyen bindings rivales. Por eso `PySide6.QtCore`, `QtGui` y `QtWidgets` suelen ser redundantes en `hidden_imports`; son inocuos y pueden hacer explícita la intención. Añade módulos como `PySide6.QtSvg` solo si realmente los utilizas y no están siendo detectados.
+
+## Perfiles de plataforma
+
+Los tres perfiles comparten `bundle_mode`, `paths`, `collect_all`, `debug` y `optimization`. Windows añade `uac`; macOS añade `mac_bundle_identifier`.
+
+### Opciones comunes
+
+| Clave | Tipo / valores | Default | Efecto real |
+| --- | --- | --- | --- |
+| `bundle_mode` | `onedir` o `onefile` | `onedir` | Formato de PyInstaller. También acepta `bundle` y `single` como alias de `onefile`; otro valor cae en `onedir`. |
+| `paths` | lista de rutas | `[]` | Cada elemento se pasa como `--paths`; ayuda a resolver módulos o binarios fuera del path normal. |
+| `collect_all` | lista de paquetes | `[]` | Cada paquete se pasa como `--collect-all`, incluyendo código, datos y binarios que PyInstaller encuentre. Aumenta el tamaño. |
+| `hidden_imports` | lista de módulos | `[]` | Se concatena con la lista de `build.json` y se deduplica. |
+| `extra_args` | lista de strings | `[]` | Argumentos avanzados enviados a PyInstaller. También existe el alias `extra_pyinstaller_args` en settings. |
+
+Las rutas relativas se interpretan desde la raíz del proyecto en las operaciones que las resuelven. Para builds reproducibles usa rutas dentro del repositorio y evita rutas absolutas de una máquina concreta.
+
+### `debug`
+
+```json
+{
+  "debug": {
+    "enabled": false,
+    "console": false,
+    "unstripped": false,
+    "bootloader_debug": false
+  }
+}
+```
+
+| Clave | Default | Efecto |
+| --- | --- | --- |
+| `enabled` | `false` | Activa el modo debug del build y una consola. |
+| `console` | `false` | Conserva ventana de terminal. `console_window` es alias. |
+| `unstripped` | `false` | Pide información de imports mediante `--debug=imports`; no anula automáticamente `strip_binaries`. |
+| `bootloader_debug` | `false` | Usa `--debug=all` de PyInstaller. Tiene prioridad sobre `unstripped`. |
+
+También se acepta `"debug": true`, equivalente a habilitar debug y consola. `verbose_imports` existe en el modelo interno, pero el cargador actual no lo lee; no lo uses como opción pública.
+
+### `optimization`
+
+Estos son los valores predeterminados efectivos del CLI cuando no defines una configuración propia:
+
+```json
+{
+  "optimization": {
+    "strip_binaries": true,
+    "clean_build": true,
+    "upx_enabled": true,
+    "upx_dir": null,
+    "upx_level": 9,
+    "upx_excludes": [
+      "vcruntime140.dll",
+      "python3*.dll",
+      "sdl2.dll",
+      "glew32.dll",
+      "kivy*.pyd"
+    ],
+    "exclude_binaries": [],
+    "exclude_plugins": [],
+    "bytecode_opt": 1,
+    "remove_translations": true,
+    "exclude_modules": [
+      "unittest",
+      "test",
+      "pydoc"
+    ]
+  }
+}
+```
+
+`exclude_binaries` y `exclude_plugins` están vacíos por defecto de forma intencional: Qyro no puede saber qué binarios o capacidades Qt utiliza tu aplicación. En cambio, `upx_excludes` protege runtimes que suelen fallar al comprimirse y `exclude_modules` retira herramientas de desarrollo de la biblioteca estándar.
+
+| Clave | Tipo / default | Qué hace |
+| --- | --- | --- |
+| `strip_binaries` | boolean, `true` | En sistemas Unix añade `--strip` y vuelve a ejecutar `strip` sobre binarios compatibles. Se omite en Windows. |
+| `clean_build` | boolean, `true` | Añade `--clean`, retira temporales, metadatos `*.dist-info`, traducciones y algunos plugins Qt genéricos/Wayland. |
+| `upx_enabled` | boolean, `true` | Permite compresión UPX y un pase posterior sobre binarios. En macOS se desactiva. |
+| `upx_dir` | ruta o `null` | Carpeta que contiene el binario `upx`; si existe se pasa a PyInstaller. |
+| `upx_level` | entero `1`–`9`, default `9` | Nivel usado por el pase posterior de UPX. Fuera de rango invalida el manifest. |
+| `upx_excludes` | lista de globs; default mostrado arriba | Evita comprimir binarios delicados. Conviene conservar runtime de Python, Qt Core y runtimes de C/C++. |
+| `bytecode_opt` | `0`, `1` o `2`, default `1` | Optimización Python: ninguna, `-O` o `-OO`. El nivel `2` elimina docstrings. |
+| `exclude_modules` | lista; default `unittest`, `test`, `pydoc` | Pasa `--exclude-module` y después elimina binarios/directorios relacionados. |
+| `exclude_binaries` | lista de globs; default `[]` | Elimina coincidencias del resultado después de PyInstaller. |
+| `exclude_plugins` | lista de nombres/globs; default `[]` | Elimina categorías del directorio de plugins Qt. `*` o `all` conserva únicamente `platforms`. |
+| `remove_translations` | boolean, `true` | Elimina carpetas `translations`. `clean_build: true` también las elimina aunque aquí pongas `false`. |
+
+#### Ejemplo completo para PySide6
+
+El siguiente perfil aplica una reducción agresiva a una aplicación PySide6 basada únicamente en Widgets. Es un ejemplo editable, no un conjunto de exclusiones obligatorio:
+
+```json
+{
+  "optimization": {
+    "strip_binaries": true,
+    "clean_build": true,
+    "upx_enabled": true,
+    "upx_dir": null,
+    "upx_level": 9,
+    "upx_excludes": [
+      "vcruntime140.dll",
+      "python3*.dll",
+      "PySide6.QtCore.pyd",
+      "MSVCP140.dll",
+      "Qt6Core.dll"
+    ],
+    "exclude_binaries": [
+      "opengl32sw.dll",
+      "qdirect2d.dll",
+      "qoffscreen.dll",
+      "qminimal.dll"
+    ],
+    "exclude_plugins": [
+      "generic",
+      "networkinformation",
+      "tls",
+      "styles",
+      "platforminputcontexts",
+      "iconengines",
+      "imageformats"
+    ],
+    "bytecode_opt": 1,
+    "remove_translations": true,
+    "exclude_modules": [
+      "PySide6.QtWebEngineCore",
+      "PySide6.QtWebEngineWidgets",
+      "PySide6.QtWebEngineQuick",
+      "PySide6.Qt3DCore",
+      "PySide6.QtQuick3D",
+      "PySide6.Qt3DAnimation",
+      "PySide6.QtPdf",
+      "PySide6.QtMultimedia",
+      "PySide6.QtSpatialAudio",
+      "PySide6.QtSensors",
+      "PySide6.QtBluetooth",
+      "PySide6.QtCharts",
+      "PySide6.QtDesigner",
+      "PySide6.QtVirtualKeyboard",
+      "PySide6.QtQml",
+      "PySide6.QtQuick",
+      "PySide6.QtQuickWidgets",
+      "PySide6.QtOpenGL",
+      "PySide6.QtOpenGLWidgets",
+      "PySide6.QtSvg",
+      "PySide6.QtNetwork",
+      "tkinter",
+      "unittest",
+      "test",
+      "pydoc"
+    ]
+  }
+}
+```
+
+<Warning>
+  `exclude_modules`, `exclude_binaries` y `exclude_plugins` no son simples sugerencias para PyInstaller: Qyro hace una purga posterior del resultado. Excluir `QtNetwork`, `tls`, `imageformats`, `styles`, QML/Quick, multimedia o OpenGL puede romper HTTPS, imágenes, estilos, vistas o renderizado. Empieza con los defaults, mide el tamaño y añade una exclusión cada vez acompañada de una prueba funcional.
+</Warning>
+
+#### Qué eliminan las exclusiones del ejemplo
+
+| Entrada o familia | Funcionalidad que debes comprobar antes de excluirla |
+| --- | --- |
+| `PySide6.QtWebEngine*` | Navegador Chromium embebido, HTML avanzado y widgets/Quick de WebEngine. |
+| `PySide6.Qt3D*`, `QtQuick3D` | Escenas, animación y renderizado 3D. |
+| `PySide6.QtPdf` | Lectura y visualización PDF mediante Qt. |
+| `PySide6.QtMultimedia`, `QtSpatialAudio` | Audio, video, cámaras y audio espacial. |
+| `PySide6.QtSensors`, `QtBluetooth` | Sensores del dispositivo y Bluetooth. |
+| `PySide6.QtCharts` | Gráficas Qt Charts. |
+| `PySide6.QtDesigner` | Integración/runtime de Qt Designer y carga de formularios que dependa de ella. |
+| `PySide6.QtVirtualKeyboard` | Teclado virtual/táctil. |
+| `PySide6.QtQml`, `QtQuick`, `QtQuickWidgets` | Motor QML, interfaces Qt Quick y su integración en widgets. |
+| `PySide6.QtOpenGL`, `QtOpenGLWidgets` | APIs y widgets OpenGL. |
+| `PySide6.QtSvg` | Lectura/renderizado SVG mediante Qt SVG. |
+| `PySide6.QtNetwork` | Red Qt, sockets y funciones que pueden respaldar TLS/HTTPS. |
+| `tkinter` | Interfaz Tk y librerías Tcl/Tk; exclúyelo solo si ninguna dependencia lo usa. |
+| `unittest`, `test`, `pydoc` | Herramientas de desarrollo de la biblioteca estándar; suelen ser las exclusiones menos riesgosas en producción. |
+
+| Plugin Qt | Qué deja de estar disponible |
+| --- | --- |
+| `generic` | Plugins genéricos de entrada; puede afectar dispositivos o entornos especiales. |
+| `networkinformation` | Detección del estado/conectividad de red. |
+| `tls` | Backends TLS de Qt; puede romper conexiones seguras. |
+| `styles` | Estilos adicionales de widgets. |
+| `platforminputcontexts` | Métodos de entrada, IME y composición para determinados idiomas/escritorios. |
+| `iconengines` | Motores adicionales de iconos, incluidos formatos/temas que los necesiten. |
+| `imageformats` | Codecs de imagen como JPEG, GIF, WebP o SVG según el toolkit instalado. |
+
+Los binarios `opengl32sw.dll`, `qdirect2d.dll`, `qoffscreen.dll` y `qminimal.dll` corresponden, respectivamente, al renderizador OpenGL por software y a backends Direct2D, offscreen y minimal. Retíralos solo si el backend de producción no puede seleccionarlos. La carpeta/plugin `platforms` que contiene `qwindows`, `qcocoa` o `qxcb` es imprescindible para mostrar ventanas y Qyro la protege en la purga global.
+
+Los globs con DLL de los ejemplos de Windows, como `opengl32sw.dll`, no aportan nada en Linux o macOS. Puedes mantener perfiles separados para que cada lista describa binarios que realmente existen en esa plataforma.
+
+## `windows.json`
+
+```json
+{
+  "bundle_mode": "onedir",
+  "paths": [],
+  "collect_all": [],
+  "uac": {
+    "level": "asInvoker",
+    "ui_access": false
+  },
+  "debug": {
+    "enabled": false,
+    "console_window": false
+  },
+  "optimization": {
+    "strip_binaries": true,
+    "clean_build": true,
+    "upx_enabled": true,
+    "upx_dir": null,
+    "upx_level": 9,
+    "upx_excludes": [
+      "vcruntime140.dll",
+      "python3*.dll",
+      "PySide6.QtCore.pyd",
+      "MSVCP140.dll",
+      "Qt6Core.dll"
+    ],
+    "exclude_binaries": [],
+    "exclude_plugins": [],
+    "bytecode_opt": 1,
+    "exclude_modules": ["unittest", "test", "pydoc"]
+  }
+}
+```
+
+### Control de UAC
+
+| Clave | Valores | Efecto |
+| --- | --- | --- |
+| `uac.level` | `asInvoker` | Se ejecuta con los permisos del usuario; default. |
+|  | `highestAvailable` | El modelo lo reconoce, pero el adaptador actual no emite un flag PyInstaller específico para este nivel. |
+|  | `requireAdministrator` | Añade `--uac-admin` y Windows solicitará elevación. |
+| `uac.ui_access` | boolean | Añade `--uac-uiaccess`. Úsalo solo si entiendes los requisitos de firma e instalación de Windows. |
+
+También se acepta `"uac": true` para solicitar administrador y `false` para `asInvoker`. El flag `qyro build --uac` fuerza administrador sobre el JSON.
+
+En Windows, `strip_binaries` no ejecuta `strip`. UPX puede reducir el tamaño pero ciertos antivirus reaccionan a ejecutables comprimidos; valida siempre el artefacto firmado en el entorno de distribución.
+
+## `linux.json`
+
+```json
+{
+  "categories": "Utility;",
+  "description": "Cliente de escritorio",
+  "author_email": "dev@example.com",
+  "url": "https://example.com",
+  "bundle_mode": "onedir",
+  "paths": [],
+  "collect_all": [],
+  "debug": {
+    "enabled": false,
+    "console": false
+  },
+  "optimization": {
+    "strip_binaries": true,
+    "clean_build": true,
+    "upx_enabled": true,
+    "upx_dir": null,
+    "upx_level": 9,
+    "upx_excludes": ["libpython3*.so*", "libQt6Core.so*", "QtCore.abi3.so"],
+    "exclude_binaries": [],
+    "exclude_plugins": [],
+    "bytecode_opt": 1,
+    "exclude_modules": ["unittest", "test", "pydoc"]
+  }
+}
+```
+
+`categories`, `author_email`, `description` y `url` quedan disponibles como settings, pero el empaquetador Linux actual no los transfiere a FPM. Los paquetes `deb`, `rpm` y `arch` usan principalmente `app_name`, `version` y el prefijo `/opt/<app_name>`. No dependas todavía de esas cuatro claves para los metadatos finales del paquete.
+
+`strip_binaries` y UPX pueden fallar o dañar extensiones nativas poco comunes. Conserva `libpython`, Qt Core y la extensión del binding en `upx_excludes` y ejecuta el binario en una distribución igual a la de destino.
+
+## `mac.json`
+
+```json
+{
+  "bundle_mode": "onedir",
+  "paths": [],
+  "collect_all": [],
+  "mac_bundle_identifier": "com.qyroteam.qyrokivyapp",
+  "debug": {
+    "enabled": false,
+    "console": false
+  },
+  "optimization": {
+    "strip_binaries": true,
+    "clean_build": true,
+    "upx_enabled": false,
+    "exclude_binaries": [],
+    "exclude_plugins": [],
+    "bytecode_opt": 1,
+    "exclude_modules": ["unittest", "test", "pydoc"]
+  }
+}
+```
+
+| Clave | Significado |
+| --- | --- |
+| `mac_bundle_identifier` | Identificador reverse-DNS enviado a PyInstaller. `bundle_identifier` es alias. Si falta, Qyro sugiere uno a partir de autor y nombre. |
+| `sign.mac.target_architecture` | Arquitectura enviada al build de macOS. `universal2` requiere dependencias universales; el flujo actual puede degradarla a la arquitectura nativa con un warning. |
+
+<Warning>
+  **UPX no se recomienda en macOS.** Comprimir los binarios puede provocar fallos durante el arranque, invalidar la firma de código y hacer que fallen la notarización o las verificaciones de Gatekeeper. Mantén `upx_enabled: false` en los builds de release firmados.
+</Warning>
+
+El adaptador actual mantiene UPX desactivado en macOS aunque `upx_enabled` sea `true`, pero debes conservar el valor explícito `false` para documentar la intención y evitar depender de ese comportamiento interno. Después de modificar el `.app`, Qyro aplica una firma ad hoc; para distribución usa `qyro sign` con una identidad Developer ID válida.
+
+## `build.json`
+
+`build.json` vive en la raíz, no dentro de `settings/`, y es **opcional**. Para proyectos nuevos configura el build y sus optimizaciones en `settings/<plataforma>.json`; reserva `build.json` para overrides excepcionales estrictamente ligados al freezer:
+
+```json
+{
+  "entry_point": "src/main.py",
+  "platform": "windows",
+  "bundle_mode": "onefile",
+  "icon": "resources/base/app.ico",
+  "hidden_imports": ["my_app.plugins.pdf"],
+  "paths": ["vendor"],
+  "collect_all": ["babel"],
+  "extra_args": ["--log-level", "WARN"],
+  "resource_protection": {
+    "enabled": true,
+    "settings_dir": "settings",
+    "resources_dir": "resources",
+    "bundle_path": ".qyro/protected_resources.pak"
+  }
+}
+```
+
+El nivel superior debe ser un objeto JSON. Si la sintaxis es inválida, el CLI muestra un warning y continúa con settings; una lista, string u otro tipo en el nivel superior no es un manifest soportado.
+
+### Claves reconocidas
+
+| Grupo | Claves |
+| --- | --- |
+| Identidad y entrada | `app_name`, `author`, `version`, `entry_point`, `binding` |
+| Plataforma y formato | `platform`, `bundle`, `bundle_mode` |
+| Comportamiento | `uac`, `debug`, `optimization` |
+| PyInstaller | `hidden_imports`, `icon`, `extra_args`, `paths`, `collect_all` |
+| macOS | `mac_bundle_identifier`, `bundle_identifier` |
+| Protección | `resource_protection`, `protected_resources` |
+
+En `build.json`, `bundle` es un alias string de `bundle_mode` y debe contener `"onedir"` o `"onefile"`. No es el objeto `bundle` de `release.json`, que configura DMG, NSIS y archivos adicionales.
+
+### Precedencia real
+
+`build.json` no se fusiona uniformemente con settings. La regla depende del tipo de campo:
+
+| Tipo de campo | Comportamiento |
+| --- | --- |
+| Escalares como `app_name`, `author`, `version`, `entry_point`, `binding`, `icon` y bundle ID | Un valor no vacío de `build.json` gana. Si es `null`, `false` o una cadena vacía, el código puede caer al valor de settings porque utiliza `or`. |
+| `platform` | Se toma directamente de `build.json` cuando la clave existe. Debe ser un string de plataforma válido. |
+| Objetos `uac`, `debug`, `optimization` | Un objeto no vacío de `build.json` sustituye al objeto completo de settings. Las claves internas que falten usan defaults del CLI; no se completan desde el objeto de settings. |
+| `resource_protection` / `protected_resources` | Se usa el primer valor verdadero entre ambos aliases y settings. Para desactivar una configuración activa usa `{"enabled": false}`; un `false` directo puede caer al valor de settings. |
+| Listas | Se concatenan como se explica en la tabla siguiente. |
+
+Este uso de `or` también afecta a booleanos directos. Para desactivar valores que estén activos en settings, utiliza objetos explícitos:
+
+```json
+{
+  "uac": {
+    "level": "asInvoker",
+    "ui_access": false
+  },
+  "debug": {
+    "enabled": false,
+    "console": false
+  },
+  "resource_protection": {
+    "enabled": false
+  }
+}
+```
+
+### Combinación de listas
+
+| Lista | Resultado |
+| --- | --- |
+| `hidden_imports` | Elementos de `build.json` + elementos de settings; se eliminan duplicados conservando el orden. |
+| `paths` | Elementos de `build.json` + elementos de settings; no se eliminan duplicados. |
+| `collect_all` | Elementos de `build.json` + elementos de settings; no se eliminan duplicados. |
+| `extra_args` | Elementos de `build.json` + `extra_pyinstaller_args` o `extra_args` de settings; no se eliminan duplicados. En macOS pueden añadirse después argumentos de firma y arquitectura. |
+
+### Opciones del comando
+
+Cuando se proporcionan, `--mode`/`--onefile`, `--debug`, `--console`, `--uac` y `--clean` tienen prioridad sobre el manifest. `--debug`, `--console`, `--uac` y `--clean` son flags de activación: el parser actual no ofrece `--no-debug`, `--no-console`, `--no-uac` ni `--no-clean` para forzar `false`.
+
+`--target` selecciona el perfil de plataforma antes de leer `build.json`; `--profile` selecciona otro perfil, `release` por defecto. El valor `build.json.platform` cambia el target del manifest, pero no carga automáticamente el JSON de otra plataforma ni proporciona compilación cruzada. Construye Windows en Windows, macOS en macOS y Linux en Linux con sus toolchains nativos.
+
+## `release.json`
+
+Este archivo es un perfil del CLI. El Engine no lo carga automáticamente al arrancar tu app. Puede contener opciones de build de release, protección y bundle:
+
+```json
+{
+  "bundle_mode": "onedir",
+  "resource_protection": {
+    "enabled": true,
+    "settings_dir": "settings",
+    "resources_dir": "resources",
+    "bundle_path": ".qyro/protected_resources.pak"
+  },
+  "bundle": {
+    "extra_files": [
+      "README.md",
+      {
+        "source": "docs/RELEASE_NOTES.md",
+        "destination": "docs/RELEASE_NOTES.md"
+      }
+    ],
+    "dmg": {
+      "window": {"x": 200, "y": 120},
+      "window_size": {"width": 660, "height": 420},
+      "icon_size": 120,
+      "app_position": {"x": 180, "y": 180},
+      "applications_position": {"x": 480, "y": 180},
+      "background": "assets/dmg-background.jpg"
+    },
+    "nsis": {
+      "icons": {
+        "install": "resources/base/install.ico",
+        "uninstall": "resources/base/uninstall.ico"
+      },
+      "welcome_bitmap": "resources/base/welcome.bmp",
+      "install_location": "programfiles64",
+      "execution_level": "highest"
+    }
+  }
+}
+```
+
+Claves como `"release": true` o `"environment": "production"` pueden servir a tu aplicación, pero los casos de uso actuales de bundle/firma no les atribuyen comportamiento.
+
+Como `release.json` se fusiona antes de construir el manifest, también puede sobrescribir campos comunes de build como `bundle_mode`, `debug`, `optimization`, `paths`, `collect_all`, `hidden_imports`, `icon` o `resource_protection`. `bundle` solo es interpretado por su caso de uso; la firma vive en `sign.json`.
+
+### `resource_protection`
+
+| Clave | Default | Significado |
+| --- | --- | --- |
+| `enabled` | `false` | Empaqueta `settings/` y `resources/` en un contenedor cifrado y compila el módulo de secreto de runtime. |
+| `settings_dir` | `settings` | Carpeta source de configuración. |
+| `resources_dir` | `resources` | Carpeta source de recursos. |
+| `bundle_path` | `.qyro/protected_resources.pak` | Ruta interna del paquete protegido. |
+
+`protected_resources` es alias. Incluso sin protección completa, el build actual compila el runtime para proteger `secrets.json`; necesitas Cython y un compilador C. Lee [Recursos protegidos](/es/protected-resources) antes de considerar esto una frontera de seguridad.
+
+### `bundle.extra_files`
+
+Una entrada string copia el archivo o carpeta a la raíz de la entrega. Una entrada objeto usa:
+
+| Clave | Obligatoria | Regla |
+| --- | --- | --- |
+| `source` | sí | Ruta existente, relativa al proyecto o absoluta. |
+| `destination` | no | Ruta relativa dentro del bundle. No puede ser absoluta ni escapar con `..`. |
+
+Ejecuta `qyro bundle --check` para validar las fuentes y destinos sin generar el paquete.
+
+Los archivos se copian primero al staging general `release/<app_name>/`. Por eso forman parte de formatos que empaquetan ese staging, como `dir`, `zip` y `tar.gz`. El generador DMG actual crea después un staging independiente y copia únicamente `<app_name>.app`: **`bundle.extra_files` no introduce hoy esos archivos dentro del `.dmg`**. Permanecen junto a la entrega en `release/<app_name>/`. Si necesitas documentación, licencias u otros archivos visibles dentro del DMG, esa capacidad requiere un cambio en Qyro CLI; no dependas de `extra_files` para ello en la versión actual.
+
+### `bundle.dmg`
+
+| Clave | Forma | Efecto |
+| --- | --- | --- |
+| `window` | `{x, y}` | Posición inicial de la ventana. |
+| `window_size` | `{width, height}` | Tamaño de la ventana. |
+| `icon_size` | entero positivo | Tamaño de iconos. |
+| `app_position` | `{x, y}` | Posición del `.app`; `app_icon_position` es alias. |
+| `applications_position` | `{x, y}` | Posición del enlace Applications; `app_drop_link` es alias. |
+| `background` | ruta | Imagen de fondo existente. |
+
+Cualquier personalización requiere `create-dmg`. Sin personalización, Qyro prefiere `create-dmg` y puede usar `hdiutil` como fallback en macOS.
+
+### `bundle.nsis`
+
+| Clave | Valores / default | Efecto |
+| --- | --- | --- |
+| `icons.install` | ruta; default `resources/base/install.ico` si existe | Icono del instalador. Si declaras la clave, el archivo es obligatorio. |
+| `icons.uninstall` | ruta; default `resources/base/uninstall.ico` si existe | Icono del desinstalador. Si declaras la clave, el archivo es obligatorio. |
+| `welcome_bitmap` | ruta opcional | Bitmap de bienvenida/finalización; si se declara debe existir. |
+| `install_location` | `programfiles64`, `programfiles32`, `appdata`; default `programfiles64` | Carpeta base de instalación. |
+| `execution_level` | `highest`, `admin`, `user`; default `highest` | Nivel solicitado por el instalador NSIS. |
+
+NSIS requiere `makensis`. El nivel del instalador es independiente de `uac` del ejecutable.
+
+## `sign.json`
+
+Este perfil local reúne toda la configuración exclusiva de `qyro sign`. El CLI lo carga después de `release.json`. El Engine no lo lee, y el CLI lo excluye tanto de los datos ordinarios de PyInstaller como del paquete de recursos protegidos.
+
+```json
+{
+  "sign": {
+    "windows": {
+      "certificate": "src/sign/windows/certificate.pfx",
+      "password": "contraseña-del-certificado",
+      "timestamp_server": "https://timestamp.digicert.com",
+      "description": "QyroKivyApp",
+      "url": "https://example.com"
+    },
+    "mac": {
+      "identity": "Developer ID Application: Example (TEAMID)",
+      "entitlements": "src/sign/mac/entitlements.plist",
+      "notary": {
+        "enabled": true,
+        "staple": true,
+        "assess_gatekeeper": true,
+        "keychain_profile": "QYRO-NOTARY"
+      }
+    }
+  }
+}
+```
+
+Añade `settings/sign.json`, certificados y claves privadas a `.gitignore`. En CI, genera o monta estos archivos desde el almacén de secretos justo antes de firmar.
+
+### `sign.windows`
+
+| Clave | Obligatoria | Significado |
+| --- | --- | --- |
+| `certificate` | sí | Archivo PFX/P12 para Authenticode. Default legacy: `src/sign/windows/certificate.pfx`. |
+| `password` | sí | Contraseña del certificado, almacenada localmente en `sign.json`. |
+| `timestamp_server` | no | Servidor RFC 3161/Authenticode utilizado por `signtool`. |
+| `description` | no | Descripción firmada; default `app_name`. |
+| `url` | no | URL informativa incluida en la firma. |
+
+`qyro sign` recorre `.exe`, `.cab`, `.dll`, `.ocx`, `.msi` y `.xpi` dentro del resultado. Requiere Windows y `signtool`.
+
+### `sign.mac`
+
+| Clave | Significado |
+| --- | --- |
+| `identity` | Identidad disponible en Keychain para `codesign`. |
+| `entitlements` | Archivo plist utilizado durante la firma. |
+| `notary.enabled` | Activa envío con `notarytool`. |
+| `notary.staple` | Adjunta el ticket después de notarizar; default `true`. |
+| `notary.assess_gatekeeper` | Ejecuta evaluación con Gatekeeper; default `false`. |
+
+Configura exactamente un método de autenticación de notarización:
+
+1. `notary.keychain_profile`;
+2. `notary.key_path` + `notary.key_id` y, si aplica, `notary.issuer`;
+3. `notary.apple_id` + `notary.team_id` + `notary.app_password`.
+
+Los flags `--notarize`, `--staple`, `--no-assess` y `--keychain-profile` pueden sobrescribir estas opciones para una invocación.
+
+### Claves legacy de firma
+
+Para proyectos antiguos, el CLI conserva aliases planos dentro de `sign.json`: `windows_sign_certificate`, `windows_sign_pass`, `windows_sign_server`, `windows_sign_description`, `mac_sign_identity`, `mac_sign_entitlements`, `mac_sign_notarize`, `mac_sign_staple`, `mac_sign_assess`, `mac_sign_notary_profile`, `mac_sign_notary_key`, `mac_sign_notary_key_id`, `mac_sign_notary_issuer`, `mac_sign_apple_id`, `mac_sign_team_id` y `mac_sign_app_password`. Las estructuras `sign.windows` y `sign.mac` son la forma recomendada. `mac_target_architecture` es una opción de build y pertenece en `mac.json`.
+
+## `secrets.json`
+
+Este archivo contiene claves de API, tokens, licencias y otros datos protegidos que la aplicación necesita en runtime. Debe ser un objeto JSON y se aplica como override:
+
+```json
+{
+  "api_url": "https://api.example.com",
+  "api_key": "clave-de-la-aplicacion",
+  "service_token": "token-protegido",
+  "license_key": "licencia-local"
+}
+```
+
+En source, el Engine lee el JSON local. Durante `qyro build`, el CLI excluye el archivo plano, cifra el objeto completo con AES-256-GCM y guarda `.qyro/secrets.enc` dentro de `protected_resources.pak`; el módulo runtime compilado permite que el Engine lo autentique, descifre y fusione en memoria. La aplicación accede a los valores con `context.app_settings` o `self.app_settings` de la misma manera en ambos modos.
+
+El Engine hace merge superficial: si tu aplicación usa objetos anidados, repite el objeto completo en `secrets.json` o utiliza claves planas. El CLI hace merge profundo. No añadas un objeto `sign` ni aliases planos de firma: el build los rechaza para evitar que esas credenciales entren en el cliente. Firma y notarización pertenecen exclusivamente a `sign.json`.
+
+<Note>
+  `secrets.json` viaja cifrado con la aplicación; `sign.json` nunca se empaqueta. Esta separación evita distribuir por accidente contraseñas de certificados, identidades o credenciales de notarización.
+</Note>
+
+Reglas prácticas:
+
+- añade `settings/secrets.json` a `.gitignore` y comprueba con `git status` antes de cada commit;
+- añade también `settings/sign.json` a `.gitignore`;
+- usa `{}` si el primer build sin protección necesita el archivo y la app no tiene secretos;
+- utiliza `secrets.json` para los valores sensibles y mantenlo fuera del control de versiones;
+- no imprimas el diccionario de settings en logs;
+- recuerda que los valores se descifran en memoria cuando la app los usa; para secretos de alto valor aplica alcance mínimo, rotación y tokens de vida corta.
+
+Consulta [Secrets](/es/secrets) para la carga source/frozen, precedencia del Engine y formato cifrado.
+
+## Recetas
+
+### Aplicación PySide6 conservadora
+
+Empieza sin purgas agresivas:
+
+```json
+{
+  "bundle_mode": "onedir",
+  "debug": {"enabled": false, "console": false},
+  "optimization": {
+    "clean_build": true,
+    "strip_binaries": false,
+    "upx_enabled": false,
+    "bytecode_opt": 1,
+    "remove_translations": false,
+    "exclude_modules": [],
+    "exclude_binaries": [],
+    "exclude_plugins": []
+  }
+}
+```
+
+Prueba el ejecutable; después activa una optimización cada vez. `onedir` facilita inspeccionar qué archivo falta y suele ser mejor durante diagnóstico. Cambia a `onefile` al final si el tiempo de arranque y la extracción temporal son aceptables.
+
+### Import dinámico que falta
+
+Si funciona en source pero aparece `ModuleNotFoundError` en el ejecutable:
+
+```json
+{
+  "hidden_imports": ["my_app.plugins.csv_export"],
+  "collect_all": ["plugin_with_data_files"]
+}
+```
+
+Usa `hidden_imports` para código importado dinámicamente y `collect_all` cuando el paquete también necesita datos o binarios.
+
+### Flujo de entrega verificable
+
+```bash
+qyro build --target windows
+qyro sign --check --platform windows
+qyro sign --platform windows
+qyro bundle --check --platform windows --format nsis
+qyro bundle --platform windows --format nsis
+```
+
+Cambia plataforma y formato en el host correspondiente. `bundle` no firma automáticamente y `sign` no crea el instalador.
+
+## Checklist antes de publicar
+
+- `entry_point`, `icon`, certificados, entitlements, fondos y archivos extra existen.
+- El binding del JSON coincide con el instalado en el entorno que ejecuta Qyro CLI.
+- El build se hizo en el mismo sistema operativo de destino.
+- Las exclusiones se probaron sobre HTTPS, imágenes, estilos, impresión, multimedia y cualquier función opcional utilizada.
+- `qyro bundle --check` y `qyro sign --check` terminan correctamente.
+- El ejecutable final arranca en una máquina limpia, no solo en el entorno de desarrollo.
+- `settings/secrets.json` y `settings/sign.json` no están versionados, y el payload de runtime no contiene credenciales de firma.

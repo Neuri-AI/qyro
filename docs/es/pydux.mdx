@@ -1,0 +1,380 @@
+---
+title: "Manejo de estado con Pydux"
+description: "Stores, slices, selectores e integración de Pydux con componentes Qyro."
+---
+
+# Manejo de estado con Pydux
+
+[Pydux](https://pydux.mintlify.site/en) es un contenedor de estado inspirado en Redux Toolkit para aplicaciones Python. Proporciona una única fuente observable de estado y un flujo predecible: la interfaz despacha una acción, un reducer calcula el siguiente estado y los consumidores reciben únicamente los valores seleccionados que cambiaron.
+
+Pydux es independiente y opcional. Qyro administra contexto, settings, recursos y ciclo de aplicación; Pydux administra estado compartido y sus transiciones. Puedes utilizar uno sin el otro.
+
+<Warning>Pydux se encuentra en fase alpha. Sus APIs, adaptadores, DevTools y metadata de distribución pueden cambiar entre versiones.</Warning>
+
+## Cuándo utilizarlo
+
+Un atributo Python, una propiedad Kivy o una variable Tkinter suelen bastar para el estado local de un solo widget. Pydux resulta útil cuando:
+
+- varias vistas necesitan leer y modificar los mismos datos;
+- quieres describir cada cambio mediante una acción;
+- diferentes componentes necesitan selecciones derivadas del mismo estado;
+- necesitas historial, inspección o *time travel* durante desarrollo;
+- quieres separar las reglas de negocio de los widgets.
+
+No utilices el store para sustituir `app_settings`. Los settings son configuración de arranque; el store representa datos que cambian mientras la aplicación se ejecuta.
+
+## Instalación
+
+Instala el paquete base con pip o Poetry:
+
+```bash
+pip install pydux
+```
+
+```bash
+poetry add pydux
+```
+
+Instala únicamente el extra del framework que utiliza el proyecto:
+
+| Integración | pip | Poetry |
+| --- | --- | --- |
+| PySide6 | `pip install "pydux[pyside6]"` | `poetry add pydux -E pyside6` |
+| PyQt6 | `pip install "pydux[pyqt6]"` | `poetry add pydux -E pyqt6` |
+| PySide2 | `pip install "pydux[pyside2]"` | `poetry add pydux -E pyside2` |
+| PyQt5 | `pip install "pydux[pyqt5]"` | `poetry add pydux -E pyqt5` |
+| Kivy | `pip install "pydux[kivy]"` | `poetry add pydux -E kivy` |
+| Qyro + PySide6 | `pip install "pydux[qyro,pyside6]"` | `poetry add pydux -E qyro -E pyside6` |
+
+Tkinter forma parte habitualmente de CPython y no necesita un extra de Pydux. También puedes pedir al CLI que prepare la dependencia:
+
+```bash
+qyro init --name mi-app --binding PySide6 --addon pydux
+```
+
+`pydux[all]` instala todas las integraciones y resulta útil para desarrollo o pruebas de compatibilidad; una aplicación normal debería instalar solo su toolkit.
+
+## Conceptos principales
+
+| Concepto | Significado |
+| --- | --- |
+| Store | Contiene todo el estado compartido y administra dispatch y suscripciones. |
+| Slice | Sección nombrada del estado, con su estado inicial y reducers. |
+| Acción | Describe qué ocurrió mediante `type`, `payload` y metadata opcional. |
+| Reducer | Aplica una regla y produce el siguiente estado. |
+| Selector | Extrae o deriva únicamente el valor que necesita un consumidor. |
+| Dispatch | Envía una acción o thunk al store. |
+
+```text
+Evento UI → dispatch(action) → reducer actualiza el estado
+                                      │
+Vista actualizada ← selector cambió ←─┘
+```
+
+La interfaz no modifica directamente el estado compartido. Despacha acciones para que los cambios sean trazables, comprobables y reproducibles.
+
+## Crear un slice y el store
+
+Un slice agrupa una sección de estado, sus reducers y los action creators generados automáticamente:
+
+```python
+from pydux import configure_store, create_slice
+
+counter_slice = create_slice(
+    name="counter",
+    initial_state={"value": 0},
+    reducers={
+        "increment": lambda state, action: state.update(
+            value=state["value"] + 1
+        ),
+        "decrement": lambda state, action: state.update(
+            value=state["value"] - 1
+        ),
+        "add": lambda state, action: state.update(
+            value=state["value"] + action.payload
+        ),
+    },
+)
+
+store = configure_store({"counter": counter_slice}, devtools=False)
+
+store.dispatch(counter_slice.actions.increment())
+store.dispatch(counter_slice.actions.add(5))
+
+print(store.get_state())  # {"counter": {"value": 6}}
+```
+
+El tipo de `counter_slice.actions.increment()` es `counter/increment`. Un reducer recibe un borrador aislado de su slice: puede modificarlo y devolver `None`, o devolver un estado de reemplazo. No modifiques directamente el objeto entregado por `store.get_state()`.
+
+Un store puede combinar varios slices:
+
+```python
+store = configure_store(
+    {
+        "counter": counter_slice,
+        "user": user_slice,
+    },
+    devtools=False,
+)
+```
+
+Una acción de un slice deja sin cambios las demás ramas.
+
+## Selectores y suscripciones
+
+Un selector recibe el estado completo y devuelve el dato que necesita un consumidor:
+
+```python
+select_value = lambda state: state["counter"]["value"]
+
+unsubscribe = store.select(
+    selector=select_value,
+    listener=lambda value: print("Nuevo valor:", value),
+    fire_immediately=True,
+)
+
+store.dispatch(counter_slice.actions.increment())
+unsubscribe()
+```
+
+`fire_immediately=True` entrega el valor actual al suscribirse. Conserva y ejecuta `unsubscribe` cuando la suscripción no esté administrada por una integración de UI.
+
+Para derivar valores utiliza un selector memorizado:
+
+```python
+from pydux import create_selector
+
+select_label = create_selector(
+    select_value,
+    lambda value: f"Contador = {value}",
+)
+```
+
+Pydux reutiliza el último resultado mientras no cambien las entradas. `store.select` utiliza `shallow_equal` por defecto; también ofrece `is_identical` y `deep_equal` para contratos de igualdad diferentes.
+
+## Integración con Qyro
+
+La integración oficial utiliza el mixin `Reactive`. Mantén el store separado de la interfaz.
+
+En `store.py`:
+
+```python
+from pydux import configure_store, create_selector, create_slice
+
+counter_slice = create_slice(
+    name="counter",
+    initial_state={"value": 0},
+    reducers={
+        "increment": lambda state, action: state.update(
+            value=state["value"] + 1
+        )
+    },
+)
+
+store = configure_store({"counter": counter_slice}, devtools=True)
+
+select_label = create_selector(
+    lambda state: state["counter"]["value"],
+    lambda value: f"Contador = {value}",
+)
+```
+
+En `main.py`:
+
+```python
+import sys
+from PySide6.QtWidgets import QLabel, QMainWindow, QPushButton, QVBoxLayout, QWidget
+from pydux.adapters.qyro import Reactive
+from qyro import ApplicationContext
+from qyro.ui.component import Component
+from store import counter_slice, select_label, store
+
+
+class MiApp(QMainWindow, Component, Reactive, ApplicationContext):
+    def component_will_mount(self):
+        self.setMinimumSize(320, 180)
+        self.bind_selector(store, select_label, self.update_label)
+
+    def render(self):
+        container = QWidget(parent=self)
+        layout = QVBoxLayout(container)
+
+        self.label = QLabel("Preparando contador", parent=container)
+        button = QPushButton("+1", parent=container)
+        button.clicked.connect(
+            lambda: store.dispatch(counter_slice.actions.increment())
+        )
+
+        layout.addWidget(self.label)
+        layout.addWidget(button)
+        self.setCentralWidget(container)
+
+    def update_label(self, text):
+        self.label.setText(text)
+
+
+if __name__ == "__main__":
+    window = MiApp()
+    window.show()
+    sys.exit(window.run())
+```
+
+`bind_selector` puede ejecutarse en `component_will_mount()`: `Reactive` difiere la primera entrega al siguiente tick conocido para que `render()` tenga oportunidad de crear los widgets. Los dispatch posteriores notifican cuando cambia el valor seleccionado.
+
+Qyro no invoca actualmente `component_will_unmount()` desde `destroy_component()`. Si una ventana o componente puede cerrarse antes de terminar el proceso, conecta la limpieza de `Reactive` al evento nativo correspondiente:
+
+```python
+def closeEvent(self, event):
+    self.component_will_unmount()
+    super().closeEvent(event)
+```
+
+Haz que la limpieza sea idempotente si puede ejecutarse desde más de una ruta de cierre.
+
+## Props y estado compartido
+
+Utiliza props para valores proporcionados por el padre al construir un componente. Utiliza selectores para estado compartido que puede cambiar después:
+
+```python
+class StatusPanel(QWidget, Component, Reactive):
+    def component_will_mount(self):
+        self.bind_selector(store, select_status, self.update_status)
+
+    def render(self):
+        self.label = QLabel(
+            self.props.get("title", "Estado"),
+            parent=self,
+        )
+
+    def update_status(self, status):
+        title = self.props.get("title", "Estado")
+        self.label.setText(f"{title}: {status}")
+```
+
+## Conectar varios valores
+
+`connect_qyro` asigna el resultado de varios selectores como atributos y llama opcionalmente a `on_state_change`:
+
+```python
+from pydux.adapters.qyro import connect_qyro
+
+
+@connect_qyro(
+    store,
+    {
+        "label": select_label,
+        "count": lambda state: state["counter"]["value"],
+    },
+)
+class StatusPanel:
+    def on_state_change(self, values):
+        print(values)
+```
+
+El decorador administra suscripciones desde `component_will_mount()` y las cancela cuando se ejecuta `component_will_unmount()`. Los selectores se entregan de forma independiente, por lo que el primer diccionario puede contener solo los valores recibidos hasta ese momento.
+
+## Qt, Tkinter y Kivy
+
+Para componentes que no utilizan `Reactive`, `ReactiveBinding` conecta un selector con un callback mediante el bridge del toolkit:
+
+```python
+from pydux.adapters.base import ReactiveBinding
+from pydux.adapters.tkinter import TkinterBridge
+
+binding = ReactiveBinding(
+    store=store,
+    selector=lambda state: state["counter"]["value"],
+    target=lambda value: label.config(text=str(value)),
+    bridge=TkinterBridge(root),
+)
+
+binding.dispose()
+```
+
+| Framework | Bridge | Mecanismo |
+| --- | --- | --- |
+| Qt | `QtMainThreadBridge` | `QTimer.singleShot` |
+| Tkinter | `TkinterBridge(widget)` | `widget.after_idle` |
+| Kivy | `KivyBridge` | `Clock.schedule_once` |
+| Código sin framework o tests | `DirectThreadBridge` | Ejecución directa |
+
+Elige el bridge del toolkit que posee el widget. `dispose()` cancela la suscripción, pero no necesariamente una actualización que ya haya sido programada en el loop gráfico.
+
+## Trabajo asíncrono con thunks
+
+`create_async_thunk` envuelve una función síncrona o coroutine y genera acciones `pending`, `fulfilled` y `rejected`:
+
+```python
+from pydux import create_async_thunk, create_slice
+
+jobs_slice = create_slice(
+    name="jobs",
+    initial_state={"status": "idle", "result": None, "error": None},
+    reducers={},
+    extra_reducers={
+        "jobs/fetch/pending": lambda state, action: state.update(
+            status="loading", error=None
+        ),
+        "jobs/fetch/fulfilled": lambda state, action: state.update(
+            status="done", result=action.payload
+        ),
+        "jobs/fetch/rejected": lambda state, action: state.update(
+            status="failed", error=action.payload
+        ),
+    },
+)
+
+fetch_jobs = create_async_thunk(
+    "jobs/fetch",
+    lambda: ["build", "test", "release"],
+)
+
+store.dispatch(fetch_jobs())
+```
+
+El error original se vuelve a lanzar después de la acción `rejected`. Los reducers deben permanecer síncronos y sin I/O. En la implementación actual, `dispatch` espera a que el thunk termine; no despaches trabajo lento directamente desde un callback de UI sin diseñar una ejecución en background y una transferencia segura al hilo gráfico.
+
+## DevTools e inspector
+
+Con `devtools=True`, Pydux registra acciones y estados e inicia por defecto un inspector local en `127.0.0.1:8765`:
+
+```python
+store = configure_store({"counter": counter_slice}, devtools=True)
+print(store.inspector.base_url)
+
+store.devtools.undo()
+store.devtools.redo()
+store.devtools.jump_to_state(0)
+```
+
+Puedes cambiar host y puerto o impedir el arranque automático:
+
+```python
+store = configure_store(
+    {"counter": counter_slice},
+    devtools=True,
+    inspector_auto_start=False,
+    inspector_host="127.0.0.1",
+    inspector_port=9900,
+)
+```
+
+DevTools conserva snapshots y calcula diferencias después de cada dispatch. Desactívalo en producción salvo que exista una necesidad explícita. No guardes secretos en el store inspeccionado y no expongas el inspector a la red: su handler no incorpora autenticación.
+
+## Documentación oficial
+
+La referencia completa y actualizada pertenece al proyecto Pydux:
+
+- [Introducción](https://pydux.mintlify.site/en)
+- [Instalación](https://pydux.mintlify.site/en/getting-started/installation)
+- [Quickstart](https://pydux.mintlify.site/en/getting-started/quickstart)
+- [Pydux + Qyro para principiantes](https://pydux.mintlify.site/en/getting-started/qyro-for-beginners)
+- [Stores y slices](https://pydux.mintlify.site/en/concepts/store-and-slices)
+- [Selectores y suscripciones](https://pydux.mintlify.site/en/concepts/selectors)
+- [Integración con Qyro](https://pydux.mintlify.site/en/integrations/qyro)
+- [Bindings de UI](https://pydux.mintlify.site/en/integrations/ui-bindings)
+- [Thunks asíncronos](https://pydux.mintlify.site/en/guides/async-thunks)
+- [DevTools](https://pydux.mintlify.site/en/guides/devtools)
+- [Referencia de API](https://pydux.mintlify.site/en/reference/api)
+
+Esta página explica cómo encaja Pydux dentro de una aplicación Qyro. Para opciones, firmas y comportamiento propios de Pydux, utiliza siempre su documentación oficial como fuente principal.

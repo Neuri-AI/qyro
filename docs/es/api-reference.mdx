@@ -1,0 +1,253 @@
+---
+title: "Referencia de API"
+description: "Referencia completa de símbolos públicos, dominio, puertos, casos de uso y adaptadores."
+---
+
+# Referencia de API
+
+Esta página separa la API pública de alto nivel de las APIs avanzadas/internas. Los imports desde `qyro` son la superficie más estable.
+
+Los bloques de firmas son notación: las anotaciones en una lista de parámetros no son llamadas copiables. Para programas ejecutables ve a [Inicio rápido](/es/quickstart), [Frameworks](/es/frameworks) y [Aplicaciones completas](/es/examples). El proyecto está en alpha.
+
+## Paquete `qyro`
+
+```python
+from qyro import (
+    ApplicationContext,
+    Component,
+    EngineContainer,
+    PlatformDetector,
+    PlatformType,
+    ExecutionMode,
+    AppMetadata,
+    QyroEngineError,
+    ResourceNotFoundError,
+    SettingsNotFoundError,
+    FrameworkNotAvailableError,
+    get_resource,
+    load_build_settings,
+    is_frozen,
+)
+```
+
+### `get_resource(*segments, required=True) -> str`
+
+Usa el contenedor global para resolver un recurso. Lanza `ResourceNotFoundError` cuando es requerido y no existe.
+
+### `load_build_settings() -> dict`
+
+Retorna `AppMetadata.raw_settings` de la configuración cacheada.
+
+### `is_frozen() -> bool`
+
+Consulta `SystemEnvironmentAdapter.is_frozen()`.
+
+### Versión
+
+`qyro.__version__` vale actualmente `0.1.0`, mientras `pyproject.toml` declara `1.0.0a2`. Consumidores que necesiten la versión de distribución deben consultar metadata del paquete hasta que ambos valores se sincronicen.
+
+## `ApplicationContext`
+
+Constructor y comportamiento completo: [guía de ApplicationContext](/es/application-context).
+
+| Miembro | Firma / tipo |
+| --- | --- |
+| `container` | `EngineContainer` |
+| `app` | `Any` |
+| `metadata` | `AppMetadata` |
+| `app_settings` | `dict[str, Any]` |
+| `is_frozen` | `bool` |
+| `platform` | `PlatformType` |
+| `execution_mode` | `ExecutionMode` |
+| `window_title` | propiedad `str` con setter |
+| `app_icon` | propiedad `str \| None` con setter |
+| `get_default_window_title()` | `str` |
+| `get_window_title()` | `str` |
+| `set_window_title(title, window=None)` | `bool` |
+| `get_app_icon_path()` | `str \| None` |
+| `set_window_icon(path, window=None)` | `bool` |
+| `get_resource(*segments, required=True)` | `str` |
+| `run()` | `int` |
+
+## `Component`
+
+Puede usarse como mixin o decorador. Consulta [Componentes](/es/components).
+
+| Miembro | Descripción |
+| --- | --- |
+| `component_will_mount()` | Hook previo a render. |
+| `render()` | Construcción de UI. |
+| `component_did_mount()` | Hook posterior a render. |
+| `set_styles(path_or_styles=None)` | Archivo, recurso o QSS inline. |
+| `on_resize()` | Hook inicial y por cada resize. |
+| `resizeEvent(event=None)` | Integración Qt. |
+| `destroy_component()` | Desacopla y programa eliminación. |
+| `find(target_type, name="")` | Wrapper de `findChild`. |
+| `calc(a, b)` | Porcentaje truncado a `int`. |
+| `get_resource(...)` | Resolución con contenedor local/global. |
+| `app_settings` | Settings finales. |
+| `is_frozen` | Estado del entorno. |
+| `props` | `dict[str, Any]` mutable. |
+
+## `EngineContainer`
+
+```text
+EngineContainer(
+    framework_name: str | None = None,
+    custom_root: Path | None = None,
+    custom_resources_dir: Path | None = None,
+    custom_settings_dir: Path | None = None,
+    enable_sentry: bool = True,
+)
+```
+
+Atributos construidos:
+
+- `env_adapter: IEnvironmentPort`
+- `settings_adapter: ISettingsPort`
+- `resource_adapter: IResourcePort`
+- `telemetry_adapter: ITelemetryPort`
+- `framework_adapter: IUIFrameworkPort`
+- `resolve_resource_use_case`
+- `load_settings_use_case`
+- `initialize_engine_use_case`
+
+El constructor carga settings y selecciona el adaptador, pero no ejecuta automáticamente el caso de uso de arranque. No hay método `container.run()`.
+
+## Entidades de dominio
+
+### `PlatformType`
+
+Enum de cadena: `WINDOWS="windows"`, `MACOS="macos"`, `LINUX="linux"`, `ANDROID="android"`, `IOS="ios"`, `UNKNOWN="unknown"`.
+
+- `is_desktop`: Windows/macOS/Linux.
+- `is_mobile`: Android/iOS.
+
+### `ExecutionMode`
+
+- `SOURCE="source"`
+- `FROZEN_PYINSTALLER="pyinstaller"`
+- `FROZEN_GENERIC="frozen_generic"`
+- `EMBEDDED="embedded"`
+
+El detector no devuelve `EMBEDDED` ni tiene una rama para iOS. Un enum no equivale a soporte móvil completo.
+
+### `ResourceQuery`
+
+Dataclass frozen con `relative_path_segments: tuple[str, ...]`.
+
+- `from_segments(*segments)`: divide cada segmento con `Path.parts`.
+- `as_posix()`: une con `/`.
+
+### `ResourceResult`
+
+Dataclass frozen:
+
+```text
+ResourceResult(
+    absolute_path: Path,
+    exists: bool,
+    is_bundled: bool,
+    target_os: PlatformType | None = None,
+)
+```
+
+### `AppMetadata`
+
+```text
+AppMetadata(
+    app_name: str,
+    version: str = "0.1.0",
+    author: str = "",
+    identifier: str = "",
+    description: str = "",
+    raw_settings: dict[str, Any] = {},
+)
+```
+
+- `get(key, default=None)`: consulta `raw_settings`.
+- `default()`: retorna `QyroApp`, versión `1.0.0`, autor `Author`, id `com.qyro.app`.
+
+Los defaults de la dataclass, `default()` y `JsonSettingsAdapter.load_metadata()` no son idénticos; normalmente usa el objeto entregado por el contexto.
+
+`raw_settings` utiliza `field(default_factory=dict)`: cada instancia directa obtiene un diccionario propio; `{}` en la firma es notación, no un default mutable compartido.
+
+## Errores
+
+| Error | Cuándo aparece |
+| --- | --- |
+| `QyroEngineError` | Base; conserva `message` y `details`. |
+| `ResourceNotFoundError` | Recurso requerido ausente; añade `resource_name` y `search_paths`. |
+| `SettingsNotFoundError` | Reservado para settings requeridos; el adaptador actual no lo lanza. |
+| `FrameworkNotAvailableError` | Framework desconocido o no importable; añade `framework_name`. |
+| `PlatformUnsupportedError` | Disponible desde `qyro.domain`, no reexportado por `qyro`. |
+| `SecretsCryptoError` | Formato/autenticación de secretos; subclase de `ValueError`, API interna. |
+
+`str(QyroEngineError)` agrega `(Details: ...)` cuando hay detalles.
+
+## `PlatformDetector`
+
+| Método de clase/estático | Resultado |
+| --- | --- |
+| `get_platform()` | `PlatformType` desde `sys.platform`. |
+| `is_windows()` / `is_mac()` / `is_linux()` | Booleano. |
+| `is_ubuntu()` / `is_fedora()` / `is_arch()` | Lee `ID=` de `/etc/os-release`; Arch incluye Manjaro. |
+| `is_gnome()` / `is_kde()` | Busca texto en `XDG_CURRENT_DESKTOP`. |
+
+## Casos de uso
+
+### `ResolveResourceUseCase(resource_port)`
+
+- `execute(*segments, required=True) -> Path`
+
+### `LoadSettingsUseCase(settings_port)`
+
+- `execute(force_reload=False) -> AppMetadata`
+- `get_setting(key, default=None) -> Any`
+
+`force_reload=True` reconstruye metadatos sin invalidar la caché JSON del adaptador. Consulta [Settings](/es/settings).
+
+### `InitializeEngineUseCase(env_port, settings_port, framework_port, telemetry_port=None)`
+
+- `execute(argv=None) -> dict[str, Any]`
+
+## Contratos (ports)
+
+### `IEnvironmentPort`
+
+`is_frozen()`, `get_execution_mode()`, `get_platform()`, `get_root_dir()`, `get_bundle_dir()`.
+
+### `IResourcePort`
+
+`resolve(ResourceQuery) -> ResourceResult`, `list_resources(subdirectory="") -> list[Path]`.
+
+### `ISettingsPort`
+
+`load_metadata() -> AppMetadata`, `get_raw_settings() -> dict[str, Any]`.
+
+### `ITelemetryPort`
+
+`install()`, `handle_exception(exc_type, exc_value, exc_traceback)`.
+
+### `IUIFrameworkPort`
+
+`framework_name`, `is_available()`, `create_application(argv=None)`, `run()`, `exit(code=0)`. Los métodos de icono/título tienen implementación default que devuelve `False`.
+
+## Adaptadores avanzados
+
+- `SystemEnvironmentAdapter(custom_root=None)`
+- `JsonSettingsAdapter(env_port, custom_settings_dir=None)`
+- `FileSystemResourceAdapter(env_port, custom_resources_dir=None)`
+- `FrameworkFactory.create(name=None)`
+- `ConsoleExceptionHookAdapter(show_banner=True)`
+- `SentryExceptionHookAdapter(dsn="", environment="production", release="")`
+- `ProtectedResourceBundle.get_extracted_root(env_port)`
+- `ProtectedResourceBundle.get_encrypted_secrets_payload(env_port)`
+- `find_runtime_secret_module(qyro_dir)` / `read_runtime_secret(path)`
+- `derive_aes256_key(runtime_secret, salt)`
+- `encrypt_secrets_payload(plaintext, runtime_secret, *, salt=None, nonce=None)`
+- `decrypt_secrets_payload(payload, runtime_secret)`
+
+Estos símbolos no se reexportan desde `qyro` y pueden cambiar con mayor libertad.
+
+En `encrypt_secrets_payload`, `salt` y `nonce` son exclusivamente keyword. `component_will_unmount`, `context.exit`, `set_state` y `dispatch` no son métodos del core de Qyro. Pydux proporciona sus propias APIs opcionales de estado y limpieza.

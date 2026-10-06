@@ -1,0 +1,59 @@
+---
+title: "Qyro con Tkinter"
+description: "Root, mainloop y ciclo de vida nativo de Tkinter."
+---
+
+# Qyro con Tkinter
+
+Tkinter proporciona la ventana y widgets; Qyro aporta contexto, settings y rutas. No hay extra `tkinter`: Python debe incluir Tcl/Tk. Sigue el procedimiento de [Tu primera aplicación](/es/quickstart), seleccionando `--binding Tkinter` al crear el proyecto con el CLI. Esta guía explica cómo cambia la integración respecto al recorrido PySide6.
+
+## Entry point generado
+
+```python
+import tkinter as tk
+from qyro import ApplicationContext
+from qyro.ui.component import Component
+
+
+class MiApp(tk.Tk, Component, ApplicationContext):
+
+    def component_will_mount(self):
+        self.geometry("640x480")
+        self.minsize(640, 480)
+
+    def render(self):
+        label = tk.Label(
+            self,
+            text=(
+                f"Hello, World!\n\n\n"
+                f"App Title: {self.window_title}\n\n"
+                f"Active Icon: {self.app_icon}\n\n"
+                f"Platform: {self.platform.value} (Frozen: {self.is_frozen})\n"
+                f"Build Settings:\n{self.app_settings}\n"
+            ),
+            justify="left",
+            anchor="w",
+        )
+        label.place(x=50, y=50)
+
+
+if __name__ == "__main__":
+    window = MiApp()
+    window.run()
+```
+
+`tk.Tk` crea la ventana. `Component` ejecuta `component_will_mount()` y `render()`, mientras que `ApplicationContext` proporciona título, icono, plataforma, settings, recursos y `run()`. El adaptador registra la ventana como root y `window.run()` entra en `mainloop`.
+
+## Eventos, estilos y cierre
+
+Usa `pack`, `grid` o `place`, callbacks nativos y variables Tk para estado local. Un contador simple no necesita Pydux. QSS no se traduce a Tkinter: `Component.set_styles()` no hace nada cuando falta `setStyleSheet`. El wrapper `resizeEvent` es Qt; para tamaños usa `<Configure>` o los layouts de Tk.
+
+`window.destroy()` destruye la ventana. También puedes llamar `window.container.framework_adapter.exit()` cuando el adaptador conoce el root. Para liberar recursos propios registra un callback en `WM_DELETE_WINDOW` y ejecuta tu limpieza antes de destruir.
+
+Los iconos `.ico` intentan `iconbitmap`; otros archivos intentan `PhotoImage` e `iconphoto`, conservando una referencia para evitar recolección. No todos los formatos son admitidos.
+
+## Aplicación completa
+
+El archivo `docs/es/example-apps/tkinter_app.py` carga un texto con `get_resource`, aplica dimensiones de settings y muestra metadatos, plataforma y modo. Sigue [Aplicaciones completas](/es/examples) para ejecutarlo. Se validó creando widgets y procesando eventos, con cierre automático del test.
+
+La [integración Pydux](/es/pydux) muestra una alternativa solo cuando necesitas un store compartido; su bridge utiliza `after_idle` y requiere limpieza explícita.

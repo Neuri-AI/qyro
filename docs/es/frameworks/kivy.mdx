@@ -1,0 +1,60 @@
+---
+title: "Qyro con Kivy"
+description: "Aplicación Kivy con Component y ApplicationContext."
+---
+
+# Qyro con Kivy
+
+Kivy proporciona `App`, widgets, propiedades y su propio loop. La plantilla de Qyro combina `App`, `Component` y `ApplicationContext`, de modo que la clase principal dispone directamente de settings, recursos, metadatos y datos del entorno. Instala el extra `kivy` del Engine en tu entorno.
+
+```python
+from kivy.app import App
+from kivy.uix.label import Label
+from kivy.core.window import Window
+from qyro import ApplicationContext
+from qyro.ui.component import Component
+
+
+class MiApp(App, Component, ApplicationContext):
+
+    def component_will_mount(self):
+        Window.size = (640, 480)
+        Window.minimum_width = 640
+        Window.minimum_height = 480
+
+    def render(self):
+        label = Label(
+            text=(
+                f"Hello, World!\n\n"
+                f"App Title: {self.window_title}\n"
+                f"Active Icon: {self.app_icon}\n"
+                f"Platform: {self.platform.value} (Frozen: {self.is_frozen})\n\n"
+                f"Build Settings:\n{self.app_settings}\n"
+            ),
+            halign="left",
+            valign="middle",
+        )
+        label.bind(size=label.setter("text_size"))
+        return label
+
+    def build(self):
+        return self.render()
+
+
+if __name__ == "__main__":
+    MiApp().run()
+```
+
+En un proyecto generado con `qyro init --binding Kivy`, este código se coloca en el script indicado por `entry_point`. `component_will_mount()` configura la ventana, `render()` construye el widget raíz y `build()` lo entrega a Kivy. La aplicación se inicia mediante el `run()` nativo de `App`.
+
+## Ciclo de vida de Kivy
+
+`Component` proporciona `component_will_mount()` y `render()`; Kivy conserva el control de `build()`, `on_start`, `on_stop` y del loop de eventos. `ApplicationContext` añade `window_title`, `app_icon`, `platform`, `is_frozen`, `app_settings` y `get_resource(...)` a la misma instancia.
+
+QSS y `resizeEvent` no son mecanismos Kivy. Usa propiedades, `bind`, KV, canvas y `Clock` cuando corresponda.
+
+## Recursos y build
+
+El ejemplo `docs/es/example-apps/kivy_app.py` añade un texto de recurso y contador. Lee [Aplicaciones completas](/es/examples). El CLI aporta hidden imports Kivy y recopila KV en patrones de raíz, `views` y `components`; no todas las opciones del dataclass `KivyConfig` están conectadas a los hooks utilizados por el contenedor.
+
+Se revisó y ejecutó el ejemplo de construcción y eventos en el entorno local. Un import exitoso no garantiza un proveedor gráfico/OpenGL utilizable. La existencia del adaptador Kivy tampoco implica build móvil conectado: consulta [Compatibilidad](/es/compatibility).

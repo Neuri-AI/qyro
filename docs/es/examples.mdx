@@ -1,0 +1,126 @@
+---
+title: "Demos: aplicaciones completas"
+description: "Reunir CLI, Engine, recursos y estado opcional en aplicaciones ejecutables."
+---
+
+# Demos: aplicaciones completas
+
+Después del recorrido por Qyro CLI, Qyro Engine y la integración opcional de estado, puedes explorar estas aplicaciones completas. La demo principal utiliza **PySide6** y reúne contexto, settings, recursos por plataforma, un componente con props, estilos y señales.
+
+Los archivos están en `docs/es/example-apps` del repositorio documental. Son demos para estudiar y ejecutar, con configuración y assets incluidos. Para una aplicación nueva, continúa utilizando `qyro init` como en [Tu primera aplicación](/es/quickstart).
+
+## Preparar y ejecutar la demo principal
+
+Con tu entorno activo:
+
+```bash
+python -m pip install --pre "qyro-cli[desktop]" "qyro-engine[pyside6]"
+```
+
+Abre una terminal en la carpeta `example-apps/` de las demos y ejecuta:
+
+```bash
+qyro start
+```
+
+Los settings incluidos seleccionan `PySide6` y `pyside6_app.py`. Se abre una ventana que muestra nombre, versión, plataforma, modo de ejecución y un texto de recurso. Pulsa **Incrementar** para probar las señales y el contador local.
+
+## Qué incluye cada demo
+
+| Archivo | Qué demuestra |
+| --- | --- |
+| `pyside6_app.py` | Contexto, `Component`, props, settings, texto por plataforma, QSS y señales |
+| `pyqt6_app.py`, `pyqt5_app.py`, `pyside2_app.py` | La misma aplicación Qt con el binding correspondiente |
+| `tkinter_app.py` | Contexto, settings, recurso y estado local mediante variable Tk |
+| `kivy_app.py` | Construcción con `App.build`, contexto y widgets Kivy |
+| `pydux_pyside6_app.py` | Store opcional, selectors, `Reactive` y limpieza de suscripciones |
+| `pydux_tkinter_app.py` | Store opcional, bridge Tkinter y `dispose` explícito |
+
+Para otra demo, cambia **ambas** claves `binding` y `entry_point` en `settings/base.json`, instala su toolkit mediante pip y vuelve a utilizar `qyro start`. Ejecuta cada binding en un proceso separado. Las demos de Pydux requieren `python -m pip install --pre pydux`; Pydux es independiente y opcional, no parte del core.
+
+Se ejecutaron localmente PySide6, PyQt5, Tkinter, Kivy y las dos integraciones Pydux. PyQt6/PySide2 se revisaron contra la API y sintácticamente, sin ejecución gráfica local. Consulta [Compatibilidad](/es/compatibility) para interpretar el alcance de estas validaciones.
+
+## Configuración y assets
+
+El proyecto tiene `settings/base.json`, overrides de plataforma y `settings/secrets.json` con `{}`. No contiene credenciales reales. `build.json` deshabilita optimizaciones agresivas para facilitar la primera prueba empaquetada.
+
+`resources/base/texts/welcome.txt` es el texto general; `resources/windows/texts/welcome.txt` es su variante Windows. El panel Qt utiliza `resources/base/styles/panel.qss`. Las dimensiones se leen de settings y el código las aplica a la ventana.
+
+## Aplicación PySide6 completa
+
+Este es el contenido de `pyside6_app.py`. Puedes utilizarlo en el proyecto generado por CLI, junto a los settings y resources de la demo:
+
+```python
+"""Aplicación Qt: Component, settings, recursos, estilos y señales."""
+from pathlib import Path
+import sys
+
+from PySide6.QtWidgets import QLabel, QMainWindow, QPushButton, QVBoxLayout, QWidget
+from qyro import ApplicationContext, Component
+
+
+class Panel(QWidget, Component):
+    STYLES = "styles/panel.qss"
+
+    def render(self):
+        layout = QVBoxLayout(self)
+        self.label = QLabel(self.props["details"], self)
+        self.label.setWordWrap(True)
+        self.counter = QLabel("0", self)
+        self.count = 0
+        self.button = QPushButton("Incrementar", self)
+        self.button.clicked.connect(self.increment)
+        layout.addWidget(self.label)
+        layout.addWidget(self.counter)
+        layout.addWidget(self.button)
+
+    def increment(self):
+        self.count += 1
+        self.counter.setText(str(self.count))
+
+
+def create_ui():
+    root_dir = None if getattr(sys, "frozen", False) else Path(__file__).resolve().parent
+    context = ApplicationContext(
+        framework="pyside6", custom_root=root_dir, enable_sentry=False
+    )
+    window = QMainWindow()
+    context.set_window_title(context.get_default_window_title(), window=window)
+    size = context.app_settings.get("window", {})
+    window.resize(size.get("width", 620), size.get("height", 360))
+    welcome = Path(context.get_resource("texts", "welcome.txt")).read_text(encoding="utf-8")
+    details = (
+        f"{context.metadata.app_name} {context.metadata.version}\n"
+        f"{context.platform.value} / {context.execution_mode.value}\n{welcome}"
+    )
+    panel = Panel(parent=window, details=details)
+    window.setCentralWidget(panel)
+    return context, window, panel
+
+
+def main():
+    context, window, panel = create_ui()
+    window.show()
+    return context.run()
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+```
+
+El contexto se crea antes de la ventana. `Panel` recibe datos como props, construye sus widgets en `render` y carga el stylesheet de recurso. Su contador es estado local: una aplicación pequeña no necesita añadir manejo de estado compartido.
+
+En source, la demo fija una raíz basada en su archivo; en frozen permite al Engine resolver el bundle. Las variantes PyQt asignan props después del constructor nativo para evitar el fallo de acceso prematuro reproducido con PyQt5.
+
+## Build y bundle
+
+Copia la carpeta de demos a una ubicación de trabajo antes de construir, para conservar los originales como referencia. Desde esa copia:
+
+```bash
+qyro build --mode onedir --debug
+qyro bundle --format dir --no-resources
+```
+
+Build requiere las herramientas y compilador descritos en [Build y distribución](/es/tooling). Prueba el ejecutable antes de preparar la entrega: debe mostrar el modo `pyinstaller` y encontrar sus recursos desde otra carpeta de trabajo.
+
+Para protección completa, activa `resource_protection.enabled` en `build.json` y reconstruye. Para ejemplos de estado compartido y cierre de suscripciones, sigue [Pydux](/es/pydux).

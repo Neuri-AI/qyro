@@ -1,0 +1,207 @@
+---
+title: "Recursos"
+description: "Resolución multiplataforma, prioridades, consultas opcionales y listado."
+---
+
+# Recursos
+
+Un **recurso** es un archivo que forma parte de la aplicación, por ejemplo una imagen, fuente, traducción, plantilla o stylesheet. Guárdalo dentro de `resources/` y pídeselo a Qyro por su ruta relativa. Qyro devuelve una ruta absoluta que funciona tanto durante el desarrollo como dentro de la aplicación empaquetada.
+
+```text
+mi-app/
+└── resources/
+    ├── base/
+    │   ├── images/logo.png
+    │   ├── fonts/Inter.ttf
+    │   └── styles/main.qss
+    ├── windows/
+    │   └── images/logo.png
+    ├── mac/
+    │   └── images/logo.png
+    └── linux/
+        └── images/logo.png
+```
+
+No construyas estas rutas con el directorio de trabajo ni con `__file__`. Después del build, la ubicación física puede cambiar.
+
+Por practicidad, expresa la ruta con `/` dentro de una sola cadena:
+
+```python
+self.get_resource("images/logo.png")
+self.get_resource("windows/images/logo.png")
+```
+
+Usa `"images/logo.png"` para que Qyro elija automáticamente la variante de la plataforma. Incluye el prefijo, por ejemplo `"windows/images/logo.png"`, cuando quieras solicitar expresamente esa variante.
+
+## Desde ApplicationContext
+
+Cuando la ventana principal usa `ApplicationContext` como mixin, llama directamente a `self.get_resource(...)`:
+
+```python
+from PySide6.QtGui import QPixmap
+from PySide6.QtWidgets import QLabel, QMainWindow
+from qyro import ApplicationContext
+from qyro.ui.component import Component
+
+
+class MiApp(QMainWindow, Component, ApplicationContext):
+    def render(self):
+        logo_path = self.get_resource("images/logo.png")
+        logo = QLabel(parent=self)
+        logo.setPixmap(QPixmap(logo_path))
+```
+
+Aunque también se admiten varios segmentos, una sola cadena como `"images/logo.png"` suele ser más fácil de leer.
+
+## Desde un Component
+
+Un componente hijo no necesita heredar también de `ApplicationContext`. `Component` ya incluye helpers que reutilizan el Engine de la aplicación:
+
+```python
+from PySide6.QtGui import QPixmap
+from PySide6.QtWidgets import QLabel, QWidget
+from qyro.ui.component import Component
+
+
+class LogoPanel(QWidget, Component):
+    def render(self):
+        logo_path = self.get_resource("images/logo.png")
+        self.logo = QLabel(parent=self)
+        self.logo.setPixmap(QPixmap(logo_path))
+
+        settings = self.app_settings
+        if self.is_frozen:
+            print("Ejecutando la aplicación empaquetada")
+```
+
+Los helpers disponibles en un `Component` son:
+
+| Helper | Resultado |
+| --- | --- |
+| `self.get_resource(...)` | Ruta absoluta de un recurso. |
+| `self.app_settings` | Diccionario final de settings cargado por el Engine. |
+| `self.is_frozen` | `True` cuando se ejecuta una aplicación empaquetada. |
+
+Esto mantiene ligero el componente: `ApplicationContext` queda en la aplicación raíz, donde sí se necesitan el framework y el ciclo de ejecución.
+
+## Desde una función o módulo externo
+
+Si el código no hereda de `ApplicationContext` ni de `Component`, importa únicamente el helper que necesites:
+
+```python
+from qyro import get_resource
+
+font = get_resource("fonts/Inter.ttf")
+template = get_resource("templates/invoice.html")
+```
+
+También existen los helpers `load_build_settings()` e `is_frozen()`:
+
+```python
+from qyro import get_resource, is_frozen, load_build_settings
+
+settings = load_build_settings()
+logo = get_resource("images/logo.png")
+print(settings["app_name"], is_frozen())
+```
+
+Los helpers globales reutilizan el mismo contenedor que `ApplicationContext`; no crean una segunda aplicación.
+
+## Organización por plataforma
+
+Puedes proporcionar una variante para un sistema operativo y conservar una versión común como fallback:
+
+```text
+resources/
+├── windows/images/logo.png
+├── mac/images/logo.png
+├── linux/images/logo.png
+└── base/images/logo.png
+```
+
+La aplicación siempre solicita el mismo nombre:
+
+```python
+logo = self.get_resource("images", "logo.png")
+```
+
+Qyro busca primero la variante de la plataforma actual, después `resources/base/` y finalmente `resources/`. Si el build usa protección de recursos, busca primero las copias extraídas del paquete protegido y conserva el mismo orden interno.
+
+Para proyectos nuevos utiliza únicamente `resources/` en la raíz. El adaptador mantiene algunos fallbacks para estructuras antiguas, pero no es necesario conocerlos para organizar una aplicación nueva.
+
+## Source y frozen
+
+El código de acceso no cambia:
+
+| Ejecución | Dónde resuelve Qyro |
+| --- | --- |
+| Source (`qyro start`) | En la carpeta `resources/` del proyecto. |
+| Frozen (`qyro build`) | En los recursos incluidos o protegidos del bundle. |
+
+Por eso debes usar `get_resource` en vez de asumir una ruta física de PyInstaller como `_MEIPASS`.
+
+## Recurso requerido u opcional
+
+Por defecto un recurso es obligatorio. Si no existe, Qyro lanza `ResourceNotFoundError`:
+
+```python
+schema = self.get_resource("schemas/main.json")
+```
+
+Para un archivo realmente opcional utiliza `required=False` y comprueba el resultado:
+
+```python
+from pathlib import Path
+
+seasonal = self.get_resource("themes/seasonal.qss", required=False)
+if Path(seasonal).is_file():
+    self.set_styles(seasonal)
+```
+
+Con `required=False`, Qyro devuelve una ruta candidata aunque el archivo no exista. El flag evita la excepción; no garantiza que el recurso esté presente.
+
+## APIs avanzadas
+
+Cuando la aplicación utiliza `ApplicationContext` como mixin, accede a la API de bajo nivel mediante `self.container`:
+
+```python
+from PySide6.QtWidgets import QMainWindow
+from qyro import ApplicationContext
+from qyro.ui.component import Component
+
+
+class MiApp(QMainWindow, Component, ApplicationContext):
+    def list_images(self):
+        paths = self.container.resource_adapter.list_resources("images")
+        for path in paths:
+            print(path)
+```
+
+La lista contiene los hijos inmediatos de la carpeta. No es recursiva, puede devolver archivos y directorios y no garantiza el orden.
+
+Para cambiar la raíz de todo el proyecto utiliza `ApplicationContext(custom_root=...)`. Si necesitas sustituir únicamente el directorio de recursos, crea un `EngineContainer` directamente:
+
+```python
+from pathlib import Path
+from qyro import EngineContainer
+
+container = EngineContainer(
+    framework_name="Headless",
+    custom_root=Path("/srv/app"),
+    custom_resources_dir=Path("/srv/shared-assets"),
+)
+
+path = container.resolve_resource_use_case.execute("logo.svg")
+```
+
+## Buenas prácticas
+
+- Usa `self.get_resource(...)` en la aplicación raíz y en clases `Component`.
+- Usa `from qyro import get_resource` en funciones, servicios o módulos externos.
+- Coloca los archivos compartidos en `resources/base/` y crea variantes de plataforma solo cuando sean necesarias.
+- No guardes secretos en `resources/`; utiliza `settings/secrets.json`.
+- No pases rutas provenientes de usuarios sin validarlas. El resolver no es un sandbox y acepta rutas absolutas o segmentos `..`.
+- Prefiere una ruta compacta con `/`, como `"images/logo.png"`, para que los ejemplos y componentes sean más fáciles de leer en cualquier sistema operativo.
+- Configurar una ruta personalizada en el Engine no hace que el CLI la incluya automáticamente en el build.
+
+Las bases se explican en [Source/frozen](/es/source-frozen) y el empaquetado en [Tooling](/es/tooling).

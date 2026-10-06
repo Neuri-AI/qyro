@@ -1,0 +1,66 @@
+---
+title: "Qyro con PyQt5"
+description: "Primera ventana y comportamiento del adaptador PyQt5."
+---
+
+# Qyro con PyQt5
+
+PyQt5 es el binding que proporciona los widgets Qt. La [plantilla oficial Qt](https://github.com/Neuri-AI/qyro-boilerplate-qt) combina la ventana, `Component` y `ApplicationContext` mediante herencia múltiple; Qyro prepara `QApplication`, configuración y recursos antes de mostrarla.
+
+## Preparar
+
+El engine puede funcionar utilizando Python `>=3.10,<3.14`. Con el entorno de tu proyecto activo:
+
+```bash
+pip install --pre "qyro-engine[pyqt5]"
+```
+
+Utiliza un proyecto creado con `qyro init` y `--binding PyQt5`, como en [Tu primera aplicación](/es/quickstart). Coloca este código en el script indicado por `entry_point` y ejecútalo desde el proyecto con `qyro start`. El ejemplo muestra la ventana mínima; conserva los settings generados por el CLI.
+
+```python
+import sys
+from PyQt5.QtWidgets import QMainWindow, QLabel
+from qyro import ApplicationContext
+from qyro.ui.component import Component
+
+
+class MiApp(QMainWindow, Component, ApplicationContext):
+
+    def component_will_mount(self):
+        self.setMinimumSize(640, 480)
+
+    def render(self):
+        label = QLabel(
+            f"Hello, World!\n\n\n"
+            f"App Title: {self.window_title}\n\n"
+            f"Active Icon: {self.app_icon}\n\n"
+            f"Platform: {self.platform.value} (Frozen: {self.is_frozen})\n",
+            parent=self,
+        )
+        label.move(50, 50)
+        label.resize(label.sizeHint())
+
+
+if __name__ == "__main__":
+    window = MiApp()
+    window.show()
+    sys.exit(window.run())
+```
+
+`Component` llama a `component_will_mount()` y después a `render()`. `ApplicationContext` crea o reutiliza `QApplication`, aplica el título y el icono configurados y proporciona `run()`. Finalmente, `sys.exit()` devuelve al sistema el código de salida de Qt.
+
+## Configuración, componentes y recursos
+
+En un proyecto gestionado por CLI, usa `"binding": "PyQt5"` y `"entry_point": "main.py"` en `settings/base.json`. El binding debe coincidir con el paquete que importa el entry point.
+
+Para un widget reutilizable puedes heredar de `QWidget, Component` o aplicar `@Component`. Los hooks se ejecutan tras el constructor, y QSS se aplica con `setStyleSheet`; lee [Componentes](/es/components) antes de pasar props. Reserva `ApplicationContext` para la ventana principal.
+
+En [Aplicaciones completas](/es/examples) encontrarás `pyqt5_app.py`, que añade settings, texto por plataforma, un `Panel` con props, stylesheet como recurso y un contador sin dependencia de manejo de estado. El mismo acceso a recursos se utiliza en frozen.
+
+## Límites y validación
+
+La prueba con props por keyword falló en un `Component` PyQt5 antes de inicializar SIP. El ejemplo completo utiliza un constructor posicional, llama primero al constructor de `QWidget` y asigna `self.props` después. El ejemplo mínimo de esta página no pasa props y evita esa ruta; consulta [Componentes](/es/components).
+
+Instala y usa un único binding Qt por proceso. Las rutas de iconos siguen [Resources](/es/resources); el formato y su representación dependen del sistema. Se ejecutó localmente en Windows/Python 3.13.
+
+Las restricciones del extra describen instalación, no una garantía de disponibilidad de wheels ni de todas las plataformas. Consulta [Compatibilidad](/es/compatibility) y [Build](/es/tooling).
