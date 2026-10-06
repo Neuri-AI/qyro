@@ -114,6 +114,16 @@ The distribution name declared by this repository is `qyro-engine`; the Python
 package imported by applications is `qyro`. The project is configured with
 Poetry extras. From a repository checkout:
 
+Install Poetry in an isolated environment with pipx, then verify it:
+
+```bash
+pipx install poetry
+poetry --version
+```
+
+See the [official Poetry installation guide](https://python-poetry.org/docs/)
+for its macOS, Linux, WSL, and Windows installers.
+
 Base package:
 
 ```bash
@@ -159,7 +169,9 @@ my-app/
 │  ├─ base.json
 │  ├─ windows.json
 │  ├─ mac.json
-│  └─ linux.json
+│  ├─ linux.json
+│  ├─ sign.json          # CLI-only signing/notarization; never bundled
+│  └─ secrets.json       # API keys, tokens, and protected app data
 └─ resources/
    ├─ base/
    ├─ windows/
@@ -168,7 +180,8 @@ my-app/
 
 ```
 
-For protected builds, Qyro can also load a generated encrypted secrets payload:
+During a frozen build, Qyro CLI excludes the plaintext `secrets.json`, encrypts
+the complete object, and packages it for the Engine to load at runtime:
 
 ```text
 my-app/
@@ -178,7 +191,13 @@ my-app/
 
 ```
 
-Encryption of `secrets.json` protects embedded secrets at rest, but it does not provide absolute protection against an attacker who can execute, debug, or reverse engineer the application.
+`sign.json` is a separate local-only Qyro CLI profile. The Engine does not load
+it, and Qyro CLI excludes it from ordinary and protected build resources.
+
+Application code reads the resulting API keys, tokens, and protected values
+through `app_settings` in both source and frozen modes. Encryption protects
+embedded secrets at rest, but values necessarily become available in process
+memory when the application uses them.
 
 ## Qyro Settings Builder
 

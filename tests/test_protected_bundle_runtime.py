@@ -120,6 +120,27 @@ def test_json_settings_adapter_loads_base_from_protected_package(tmp_path: Path)
     assert raw["feature"] is True
 
 
+def test_json_settings_adapter_does_not_load_sign_profile(tmp_path: Path) -> None:
+    settings_dir = tmp_path / "settings"
+    settings_dir.mkdir()
+    (settings_dir / "base.json").write_text(
+        '{"app_name": "RuntimeApp"}',
+        encoding="utf-8",
+    )
+    (settings_dir / "sign.json").write_text(
+        '{"sign": {"windows": {"password": "signing-only"}}}',
+        encoding="utf-8",
+    )
+
+    env = SystemEnvironmentAdapter(custom_root=tmp_path)
+    adapter = JsonSettingsAdapter(env)
+
+    raw = adapter.get_raw_settings()
+
+    assert raw["app_name"] == "RuntimeApp"
+    assert "sign" not in raw
+
+
 def test_filesystem_resource_adapter_resolves_file_from_protected_package(tmp_path: Path) -> None:
     _write_protected_package(tmp_path)
     env = SystemEnvironmentAdapter(custom_root=tmp_path)
