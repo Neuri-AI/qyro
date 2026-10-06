@@ -3,8 +3,6 @@ title: "Componentes"
 description: "Componentes y ciclo de vida en Qt, Tkinter y Kivy."
 ---
 
-# Componentes
-
 `Component` añade un ciclo de construcción común a widgets de **Qt**, **Tkinter** y **Kivy**. El toolkit continúa proporcionando las ventanas, widgets, layouts, eventos y estilos; Qyro organiza cuándo preparar y construir cada componente mediante hooks síncronos.
 
 No es un sistema de render reactivo: cambiar `props` no vuelve a ejecutar `render()` y no existe reconciliación automática de árboles. Puedes importarlo como `qyro.Component`, `qyro.ui.Component` o `qyro.ui.component.Component`.

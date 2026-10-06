@@ -1,0 +1,62 @@
+---
+title: "Qyro Engine"
+description: "The services your application uses at startup and during execution."
+---
+
+After creating and running a project with the CLI, you can learn what your code uses inside the application. **Qyro Engine** is that engine: it connects configuration, files, environment, and GUI framework to prepare startup and provide common services during execution.
+
+It is installed as `qyro-engine` and imported as `qyro`. The CLI uses it as a project dependency; when building a distribution, the engine accompanies the packaged application.
+
+## What the engine prepares
+
+Startup needs to know the application's name, which toolkit it uses, and where its files are located. The Engine gathers that data and connects an adapter for the selected framework.
+
+An **adapter** translates common Engine operations—creating the native application, starting its loop, or applying a title—into calls to the specific toolkit. The interface and its events remain the responsibility of Qt, Tkinter, or Kivy.
+
+| Service | What it is used for |
+| --- | --- |
+| `ApplicationContext` | Gather startup services and expose them to the code |
+| Settings | Read configuration and metadata from `settings/` |
+| Resources | Locate files in `resources/` through queryable names |
+| Environment | Identify the platform and whether execution is from source code or a packaged artifact |
+| UI adapter | Prepare the native application and connect its event loop |
+| `Component` | Organize widget construction through hooks |
+| Telemetry | Install the configured exception handling |
+
+## The application context
+
+In the first application, you used `ApplicationContext` as a mixin for the window:
+
+```python
+from PySide6.QtWidgets import QMainWindow
+from qyro import ApplicationContext
+from qyro.ui.component import Component
+
+class MainWindow(QMainWindow, Component, ApplicationContext):
+    def component_will_mount(self):
+        print(self.metadata.app_name)
+```
+
+The mixin selects the configured framework and prepares the engine before initializing the window. Its properties and methods allow you to access settings, metadata, platform, and resources without rebuilding those services in every module. Composition with an independent `ApplicationContext` instance is also available, which is useful in advanced integrations.
+
+The [ApplicationContext](/en/application-context) guide covers its initialization and use. You can then use [Component](/en/components) to organize reusable widgets through construction stages.
+
+## Configuration and resources have different roles
+
+Settings describe the application and its startup: name, version, binding, entry point, and options that Qyro CLI uses to build or distribute. The Engine consumes only the keys it needs—for example `binding`, metadata, icon, and telemetry—and leaves the others available in `app_settings`; it does not turn an arbitrary key into dimensions, a theme, or visual properties. In addition, the CLI and the Engine do not merge these files in the same way.
+
+Resources provides **file paths**: for example, an image, font, text, or stylesheet that your code opens and uses. Resolving a resource does not automatically apply it to the UI either.
+
+Both start from the structure prepared by the CLI. Begin with [Settings](/en/settings) and [Resources](/en/resources) before studying their advanced rules.
+
+## Development and packaged application
+
+During development, `qyro start` runs Python files: this mode is called **source**. After `qyro build`, the user runs an artifact that includes the application and its dependencies: this mode is called **frozen**.
+
+File locations change between the two modes. The Engine detects the environment and adapts settings and resources resolution. It does not run the build: that work has already been done by the CLI. The [Source and frozen](/en/source-frozen) guide explains the paths when you need to investigate a distribution.
+
+## Engine journey
+
+Study context, components, settings, and resources; then continue with the framework your application uses. The secrets, protection, and telemetry guides cover specific needs. Architecture and reference are consultation material for going deeper once you understand normal usage.
+
+When you need to coordinate state that changes across multiple views, continue with [State management with Pydux](/en/pydux). It is an independent and optional integration. The [demos](/en/examples) bring the concepts together in executable applications.

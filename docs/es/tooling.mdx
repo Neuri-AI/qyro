@@ -3,8 +3,6 @@ title: "Build, bundle y distribución"
 description: "El flujo real de Qyro CLI y su relación con el runtime de la aplicación."
 ---
 
-# Build, bundle y distribución
-
 Esta guía completa el recorrido de [Qyro CLI](/es/cli). Después de crear el proyecto y probarlo con `qyro start`, necesitas preparar una aplicación ejecutable y organizar sus archivos para entregarla. Aquí aprenderás las etapas de build, firma y bundle, y la configuración que utilizan.
 
 ```mermaid
@@ -184,7 +182,7 @@ qyro bundle --check
 | `nsis` | Windows, `makensis`, plantilla NSIS y opciones válidas |
 | `deb`, `rpm`, `arch` | Linux y `fpm` |
 
-Otras opciones: `--release-dir`, `--platform`, `--no-resources`, `--zip`, `--format`, `--check`. `settings/release.json` puede contener `bundle.extra_files`, `bundle.dmg` y `bundle.nsis`; la [referencia de archivos del CLI](/es/configuration-files) documenta sus tipos, defaults y validaciones. Los comandos no suben la entrega a un servicio externo.
+Otras opciones: `--release-dir`, `--platform`, `--no-resources`, `--zip`, `--format`, `--check`. `settings/release.json` puede contener `bundle.extra_files`, `bundle.dmg.extra_files` y `bundle.nsis`; `bundle.dmg.extra_files` se incluye dentro del DMG solo con `create-dmg`, no con `hdiutil`. La [referencia de archivos del CLI](/es/configuration-files) documenta sus tipos, defaults y validaciones. Los comandos no suben la entrega a un servicio externo.
 
 ## Limpiar y consultar versiones
 

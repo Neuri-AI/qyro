@@ -88,31 +88,66 @@
         "language": "en",
         "groups": [
           {
-            "group": "Getting started",
+            "group": "Qyro Fundamentals",
             "pages": [
-              "en/index",
-              "en/installation",
-              "en/quickstart",
-              "en/project-structure"
+              "en/index"
             ]
           },
           {
-            "group": "Runtime guides",
+            "group": "Qyro CLI",
             "pages": [
+              "en/cli",
+              "en/installation",
+              "en/quickstart",
+              "en/project-structure",
+              "en/configuration-files",
+              "en/tooling"
+            ]
+          },
+          {
+            "group": "Qyro Engine",
+            "pages": [
+              "en/engine",
               "en/application-context",
               "en/components",
               "en/settings",
               "en/resources",
+              "en/source-frozen",
               "en/frameworks",
-              "en/telemetry",
-              "en/protected-resources"
+              {
+                "group": "Frameworks",
+                "pages": [
+                  "en/frameworks/pyside6",
+                  "en/frameworks/pyqt6",
+                  "en/frameworks/pyqt5",
+                  "en/frameworks/pyside2",
+                  "en/frameworks/tkinter",
+                  "en/frameworks/kivy"
+                ]
+              },
+              "en/secrets",
+              "en/protected-resources",
+              "en/telemetry"
             ]
           },
           {
-            "group": "Architecture and reference",
+            "group": "Pydux: Optional Integration",
+            "pages": [
+              "en/pydux"
+            ]
+          },
+          {
+            "group": "Demos",
+            "pages": [
+              "en/examples"
+            ]
+          },
+          {
+            "group": "Reference and Maintenance",
             "pages": [
               "en/architecture",
               "en/api-reference",
+              "en/compatibility",
               "en/troubleshooting"
             ]
           }

@@ -3,8 +3,6 @@ title: "Source, frozen y rutas"
 description: "Cómo encuentra Qyro el proyecto, el bundle y los archivos en desarrollo y distribución."
 ---
 
-# Source, frozen y rutas
-
 **Source** significa ejecutar los archivos Python con un intérprete, por ejemplo cuando se ejecuta `qyro start` o `python main.py`. **Frozen** significa ejecutar un artefacto que incluye la aplicación y su entorno Python, normalmente generado por PyInstaller mediante Qyro CLI. Congelar no convierte toda la lógica Python en código nativo ni crea por sí solo un instalador.
 
 Qyro Engine adapta la lectura de configuración y recursos a ambos entornos. Cuando `ApplicationContext` forma parte de la clase principal, tu código puede seguir usando `self.get_resource("texts/welcome.txt")` aunque el archivo ya no esté en el árbol original del proyecto.

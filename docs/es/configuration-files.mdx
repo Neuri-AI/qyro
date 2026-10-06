@@ -3,8 +3,6 @@ title: "Archivos de configuración del CLI"
 description: "Referencia completa de base.json, perfiles de plataforma, build.json, release.json, sign.json y secrets.json."
 ---
 
-# Archivos de configuración del CLI
-
 Esta página describe las opciones que Qyro CLI interpreta al ejecutar `start`, `build`, `bundle` y `sign`. También aclara cuáles llegan al Qyro Engine durante la ejecución y cuáles existen únicamente para el tooling.
 
 <Tip>
@@ -456,7 +454,7 @@ El adaptador actual mantiene UPX desactivado en macOS aunque `upx_enabled` sea `
     "enabled": true,
     "settings_dir": "settings",
     "resources_dir": "resources",
-    "bundle_path": ".qyro/protected_resources.pak"
+    "bundle_path": ".qyro/resources.pak"
   }
 }
 ```
@@ -472,7 +470,7 @@ El nivel superior debe ser un objeto JSON. Si la sintaxis es inválida, el CLI m
 | Comportamiento | `uac`, `debug`, `optimization` |
 | PyInstaller | `hidden_imports`, `icon`, `extra_args`, `paths`, `collect_all` |
 | macOS | `mac_bundle_identifier`, `bundle_identifier` |
-| Protección | `resource_protection`, `protected_resources` |
+| Protección | `resource_protection`, `resources` |
 
 En `build.json`, `bundle` es un alias string de `bundle_mode` y debe contener `"onedir"` o `"onefile"`. No es el objeto `bundle` de `release.json`, que configura DMG, NSIS y archivos adicionales.
 
@@ -485,7 +483,7 @@ En `build.json`, `bundle` es un alias string de `bundle_mode` y debe contener `"
 | Escalares como `app_name`, `author`, `version`, `entry_point`, `binding`, `icon` y bundle ID | Un valor no vacío de `build.json` gana. Si es `null`, `false` o una cadena vacía, el código puede caer al valor de settings porque utiliza `or`. |
 | `platform` | Se toma directamente de `build.json` cuando la clave existe. Debe ser un string de plataforma válido. |
 | Objetos `uac`, `debug`, `optimization` | Un objeto no vacío de `build.json` sustituye al objeto completo de settings. Las claves internas que falten usan defaults del CLI; no se completan desde el objeto de settings. |
-| `resource_protection` / `protected_resources` | Se usa el primer valor verdadero entre ambos aliases y settings. Para desactivar una configuración activa usa `{"enabled": false}`; un `false` directo puede caer al valor de settings. |
+| `resource_protection` / `resources` | Se usa el primer valor verdadero entre ambos aliases y settings. Para desactivar una configuración activa usa `{"enabled": false}`; un `false` directo puede caer al valor de settings. |
 | Listas | Se concatenan como se explica en la tabla siguiente. |
 
 Este uso de `or` también afecta a booleanos directos. Para desactivar valores que estén activos en settings, utiliza objetos explícitos:
@@ -532,23 +530,23 @@ Este archivo es un perfil del CLI. El Engine no lo carga automáticamente al arr
     "enabled": true,
     "settings_dir": "settings",
     "resources_dir": "resources",
-    "bundle_path": ".qyro/protected_resources.pak"
+    "bundle_path": ".qyro/resources.pak"
   },
   "bundle": {
-    "extra_files": [
-      "README.md",
-      {
-        "source": "docs/RELEASE_NOTES.md",
-        "destination": "docs/RELEASE_NOTES.md"
-      }
-    ],
     "dmg": {
       "window": {"x": 200, "y": 120},
       "window_size": {"width": 660, "height": 420},
       "icon_size": 120,
       "app_position": {"x": 180, "y": 180},
       "applications_position": {"x": 480, "y": 180},
-      "background": "assets/dmg-background.jpg"
+      "background": "assets/dmg-background.jpg",
+      "extra_files": [
+        "README.md",
+        {
+          "source": "docs/RELEASE_NOTES.md",
+          "destination": "docs/RELEASE_NOTES.md"
+        }
+      ]
     },
     "nsis": {
       "icons": {
@@ -574,9 +572,9 @@ Como `release.json` se fusiona antes de construir el manifest, también puede so
 | `enabled` | `false` | Empaqueta `settings/` y `resources/` en un contenedor cifrado y compila el módulo de secreto de runtime. |
 | `settings_dir` | `settings` | Carpeta source de configuración. |
 | `resources_dir` | `resources` | Carpeta source de recursos. |
-| `bundle_path` | `.qyro/protected_resources.pak` | Ruta interna del paquete protegido. |
+| `bundle_path` | `.qyro/resources.pak` | Ruta interna del paquete protegido. |
 
-`protected_resources` es alias. Incluso sin protección completa, el build actual compila el runtime para proteger `secrets.json`; necesitas Cython y un compilador C. Lee [Recursos protegidos](/es/protected-resources) antes de considerar esto una frontera de seguridad.
+`resources` es alias. Incluso sin protección completa, el build actual compila el runtime para proteger `secrets.json`; necesitas Cython y un compilador C. Lee [Recursos protegidos](/es/protected-resources) antes de considerar esto una frontera de seguridad.
 
 ### `bundle.extra_files`
 
@@ -589,7 +587,7 @@ Una entrada string copia el archivo o carpeta a la raíz de la entrega. Una entr
 
 Ejecuta `qyro bundle --check` para validar las fuentes y destinos sin generar el paquete.
 
-Los archivos se copian primero al staging general `release/<app_name>/`. Por eso forman parte de formatos que empaquetan ese staging, como `dir`, `zip` y `tar.gz`. El generador DMG actual crea después un staging independiente y copia únicamente `<app_name>.app`: **`bundle.extra_files` no introduce hoy esos archivos dentro del `.dmg`**. Permanecen junto a la entrega en `release/<app_name>/`. Si necesitas documentación, licencias u otros archivos visibles dentro del DMG, esa capacidad requiere un cambio en Qyro CLI; no dependas de `extra_files` para ello en la versión actual.
+Los archivos se copian al staging general `release/<app_name>/`. Por eso forman parte de formatos que empaquetan ese staging, como `dir`, `zip` y `tar.gz`. Para incluir archivos dentro de un DMG utiliza `bundle.dmg.extra_files`.
 
 ### `bundle.dmg`
 
@@ -601,6 +599,9 @@ Los archivos se copian primero al staging general `release/<app_name>/`. Por eso
 | `app_position` | `{x, y}` | Posición del `.app`; `app_icon_position` es alias. |
 | `applications_position` | `{x, y}` | Posición del enlace Applications; `app_drop_link` es alias. |
 | `background` | ruta | Imagen de fondo existente. |
+| `extra_files` | lista | Archivos o carpetas que se colocan en la raíz del DMG. Usa las mismas formas string/objeto que `bundle.extra_files`. |
+
+`bundle.dmg.extra_files` se copia al staging específico del DMG y se incluye en la imagen cuando está disponible `create-dmg`. `hdiutil` no admite esta opción; Qyro rechaza esa configuración en vez de crear un DMG sin los archivos solicitados.
 
 Cualquier personalización requiere `create-dmg`. Sin personalización, Qyro prefiere `create-dmg` y puede usar `hdiutil` como fallback en macOS.
 
@@ -627,7 +628,7 @@ Este perfil local reúne toda la configuración exclusiva de `qyro sign`. El CLI
       "certificate": "src/sign/windows/certificate.pfx",
       "password": "contraseña-del-certificado",
       "timestamp_server": "https://timestamp.digicert.com",
-      "description": "QyroKivyApp",
+      "description": "QyroApp",
       "url": "https://example.com"
     },
     "mac": {
@@ -687,13 +688,13 @@ Este archivo contiene claves de API, tokens, licencias y otros datos protegidos 
 ```json
 {
   "api_url": "https://api.example.com",
-  "api_key": "clave-de-la-aplicacion",
-  "service_token": "token-protegido",
-  "license_key": "licencia-local"
+  "api_key": "ApplicationKey",
+  "service_token": "ServiceToken",
+  "license_key": "LicenseKey"
 }
 ```
 
-En source, el Engine lee el JSON local. Durante `qyro build`, el CLI excluye el archivo plano, cifra el objeto completo con AES-256-GCM y guarda `.qyro/secrets.enc` dentro de `protected_resources.pak`; el módulo runtime compilado permite que el Engine lo autentique, descifre y fusione en memoria. La aplicación accede a los valores con `context.app_settings` o `self.app_settings` de la misma manera en ambos modos.
+En source, el Engine lee el JSON local. Durante `qyro build`, el CLI excluye el archivo plano, cifra el objeto completo con AES-256-GCM y guarda `.qyro/secrets.enc` dentro de `resources.pak`; el módulo runtime compilado permite que el Engine lo autentique, descifre y fusione en memoria. La aplicación accede a los valores con `context.app_settings` o `self.app_settings` de la misma manera en ambos modos.
 
 El Engine hace merge superficial: si tu aplicación usa objetos anidados, repite el objeto completo en `secrets.json` o utiliza claves planas. El CLI hace merge profundo. No añadas un objeto `sign` ni aliases planos de firma: el build los rechaza para evitar que esas credenciales entren en el cliente. Firma y notarización pertenecen exclusivamente a `sign.json`.
 

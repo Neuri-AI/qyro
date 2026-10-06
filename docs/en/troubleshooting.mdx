@@ -1,0 +1,153 @@
+---
+title: "Troubleshooting"
+description: "Diagnosing frameworks, settings, resources, icons, singleton behavior, and protected bundles."
+---
+
+Start by confirming the interpreter, imported package, and working directory. Snippets using `ctx` assume a context created with the correct framework; `_...` attributes are for internal diagnostics.
+
+```bash
+python -c "import sys, qyro; print(sys.executable); print(qyro.__file__)"
+python -m qyro_cli --help
+```
+
+## An unexpected framework was selected
+
+Check the already-initialized global context:
+
+```python
+from qyro.client.context import ApplicationContext
+
+container = ApplicationContext._global_container
+if container:
+    print(container.framework_adapter.framework_name)
+```
+
+An explicit `framework` takes precedence over settings; then `binding`, `framework`, and autodetection are used. An early call to `get_resource()` or `load_build_settings()` can also create the procedural container, although `ApplicationContext` replaces that container when initialized if it does not yet have its own.
+
+For deterministic behavior, create the main context before importing modules with side effects and specify the binding in `base.json`.
+
+## `FrameworkNotAvailableError`
+
+- Confirm the Python version and extra constraints.
+- Install a single compatible toolkit.
+- In CI without a GUI, use `framework="headless"`.
+- A valid name must be one of `pyside6`, `pyqt6`, `pyside2`, `pyqt5`, `kivy`, `tkinter`, `headless`.
+
+## Empty settings
+
+```python
+ctx = ApplicationContext(framework="headless")
+print(ctx.container.env_adapter.get_root_dir())
+print(ctx.container.settings_adapter._find_settings_dir())  # internal diagnostics
+print(ctx.app_settings.get("app_name"))  # avoid printing secrets
+```
+
+Verify that the folder contains `base.json`; merely existing is not enough. The adapter silently ignores invalid JSON, so validate it with:
+
+```bash
+python -m json.tool settings/base.json
+```
+
+## A nested override removed fields
+
+The merge is shallow. Repeat the complete object in the platform file:
+
+```json
+{
+  "window": {"width": 1024, "height": 600}
+}
+```
+
+## `ResourceNotFoundError`
+
+Print roots and optionally query:
+
+```python
+adapter = ctx.container.resource_adapter
+print(adapter._get_candidate_roots())  # internal diagnostics
+candidate = ctx.get_resource("images", "logo.png", required=False)
+print(candidate)
+```
+
+Check capitalization, especially when moving from Windows/macOS to Linux. Use `mac/` or `darwin/`, `windows/` or `win32/`, and `base/` for defaults.
+
+## The icon is not displayed
+
+- Check that `ctx.get_app_icon_path()` is not `None` before converting it to `Path` and confirming that the file exists.
+- On Windows, prefer `.ico`; for Tkinter, other formats depend on `PhotoImage`.
+- In Qt, avoid creating widgets from one binding while selecting another adapter.
+- Some desktops ignore window icons or use bundle metadata.
+- `set_window_icon()` may return truthy after resolving the path even if the toolkit does not display it.
+
+## The title is overwritten
+
+Qyro preserves an explicit title detected after the constructor. To set the final title after hooks and automatic initialization have completed, assign it after creating the window:
+
+```python
+window.window_title = "Final Title"
+```
+
+## The component does not receive a native keyword
+
+`Component` reserves only `parent`; everything else becomes props. Pass the native argument positionally or consume it in your `__init__` before calling the parent.
+
+In PyQt5, passing props by keyword can also produce `RuntimeError: super-class __init__() of type ... was never called`: the wrapper queries the SIP object before initializing it. The [PyQt5 example](/en/frameworks/pyqt5) uses an explicit constructor with positional arguments and assigns props after initializing the widget. This is an observed Engine issue, not a PyQt5 requirement.
+
+## Styles are not applied
+
+- The object must have `setStyleSheet`; Kivy and Tkinter do not use QSS.
+- If it is a resource path, do not include `{` or `;` in the string.
+- Check the path with `get_resource(..., required=False)`.
+- In Qt, enabling `WA_StyledBackground` is best-effort and depends on detecting the binding.
+
+## The protected bundle is ignored
+
+You must have the `.pak` and a `runtime*.so/.pyd/.dylib` compatible with the current Python and OS together. An invalid HMAC or unreadable ZIP causes the loader to fall back to ordinary resources without raising an error.
+
+To isolate:
+
+```python
+from qyro.adapters.resources.protected_bundle import ProtectedResourceBundle
+
+root = ProtectedResourceBundle.get_extracted_root(ctx.container.env_adapter)
+print(root)
+```
+
+`None` means missing/incompatible artifacts or a validation/extraction failure.
+
+## Encrypted secrets fail
+
+Typical errors:
+
+- runtime module compiled for another version/architecture;
+- runtime secret different from the one used for encryption;
+- modified or truncated payload;
+- decrypted content that is not a UTF-8 JSON object.
+
+Do not catch the error and continue with incomplete values in production. Regenerate the bundle with Qyro CLI.
+
+## Graphical tests on a server without a display
+
+Force headless mode for logic tests. The project's own tests use fakes and do not need to create real windows. For Qt integration, you may require `QT_QPA_PLATFORM=offscreen`, depending on the binding and platform.
+
+## Exceptions do not reach Sentry
+
+Some toolkits capture callbacks. First confirm that `sentry-sdk` is installed and that settings contains `sentry_dsn`; a `SENTRY_DSN` variable by itself does not cause `EngineContainer` to select the Sentry adapter.
+
+## The CLI cannot find the project or entry point
+
+Run from the folder containing `pyproject.toml` and `settings/base.json`. `start` uses its own interpreter; activating another environment only to install the toolkit is not enough. Use `python -m qyro_cli --help` to check the actual module and options. `init` requires `--name`, not a positional name.
+
+## Build fails before PyInstaller
+
+Install the CLI's `desktop` extra and a compatible C compiler. The runtime is compiled with Cython even without full resource protection. On that path, `settings/secrets.json` must exist with at least `{}`. A build for another profile does not provide cross-compilation; Android/iOS do not have a use case connected in the current container. See [Tooling](/en/tooling).
+
+## The Pydux UI freezes or continues receiving callbacks
+
+Async thunks resolve the result inside `dispatch`; they do not automatically turn a slow task into non-blocking work. `Reactive` change delivery also does not automatically switch to the graphical thread. Use your framework's task mechanism and deliver changes on the UI thread.
+
+When closing, explicitly call `Reactive` cleanup or `ReactiveBinding.dispose()`. Canceling a subscription prevents future changes, but does not cancel an already-queued initial callback. The [integration example](/en/pydux) applies a closing guard.
+
+## Kivy `render()` has duplicated effects
+
+The official template uses `App, Component, ApplicationContext` and `build(): return self.render()`. Because `Component` also participates in mounting, avoid having `render()` modify external state, register a callback twice, or create resources that cannot be repeated. If your interface needs those effects, move them to `component_will_mount()`, `on_start()`, or another appropriate hook. See the [Kivy example](/en/frameworks/kivy).

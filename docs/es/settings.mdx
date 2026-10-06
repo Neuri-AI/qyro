@@ -3,8 +3,6 @@ title: "Configuración"
 description: "Descubrimiento, merge, metadatos, caché y secretos en JSON."
 ---
 
-# Configuración
-
 Los **settings** describen la aplicación y el proceso de build: identidad, binding, entrada, opciones de plataforma, optimización, bundle y firma. Qyro CLI utiliza muchas de esas claves para construir y distribuir; Qyro Engine vuelve a leer los archivos durante el arranque, pero solo consume directamente las claves de runtime que necesita. El resto permanece disponible en `app_settings`. Los settings no son persistencia de preferencias ni aplican por sí solos temas, tamaños o widgets.
 
 La sección [Archivos de configuración del CLI](/es/configuration-files) explica el merge profundo y los perfiles explícitos del CLI. Son reglas distintas de las que usa el Engine. Para preparar visualmente los archivos puedes comenzar con [Qyro Settings Builder](https://qyro-settings-builder.up.railway.app/), revisar la exportación y guardarla en `settings/`. Crea localmente `secrets.json` para datos protegidos de runtime y `sign.json` para firma; mantén ambos fuera del control de versiones.
