@@ -30,6 +30,7 @@ all = ["PySide6", "PyQt6", "PySide2", "PyQt5", "kivy", "sentry-sdk"]
 [tool.poetry.group.dev.dependencies]
 pytest = ">=8.0.0"
 pytest-cov = ">=4.1.0"
+cython = ">=3.0.12,<4.0.0"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

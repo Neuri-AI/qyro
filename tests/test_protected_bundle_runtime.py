@@ -4,9 +4,11 @@ import hashlib
 import hmac
 import io
 import json
+import shutil
 import subprocess
 import sys
 import secrets
+import tempfile
 import zipfile
 from pathlib import Path
 
@@ -118,6 +120,33 @@ def test_json_settings_adapter_loads_base_from_protected_package(tmp_path: Path)
 
     assert raw["app_name"] == "ProtectedApp"
     assert raw["feature"] is True
+
+
+def test_protected_bundle_does_not_trust_precreated_legacy_temp_directory(tmp_path: Path) -> None:
+    _write_protected_package(tmp_path)
+    package_path = tmp_path / ".qyro" / "protected_resources.pak"
+    digest = hashlib.sha256(package_path.read_bytes()).hexdigest()[:16]
+    attacker_root = Path(tempfile.gettempdir()) / f"qyro_protected_{digest}"
+    attacker_settings = attacker_root / "settings"
+    attacker_settings.mkdir(parents=True, exist_ok=True)
+    (attacker_settings / "base.json").write_text(
+        '{"app_name": "AttackerApp"}',
+        encoding="utf-8",
+    )
+    (attacker_root / ".ok").write_text("ok", encoding="utf-8")
+
+    try:
+        env = SystemEnvironmentAdapter(custom_root=tmp_path)
+        extracted_root = ProtectedResourceBundle.get_extracted_root(env)
+
+        assert extracted_root is not None
+        assert extracted_root != attacker_root
+        settings = json.loads(
+            (extracted_root / "settings" / "base.json").read_text(encoding="utf-8")
+        )
+        assert settings["app_name"] == "ProtectedApp"
+    finally:
+        shutil.rmtree(attacker_root, ignore_errors=True)
 
 
 def test_json_settings_adapter_does_not_load_sign_profile(tmp_path: Path) -> None:

@@ -11,6 +11,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import io
+import shutil
 import tempfile
 import zipfile
 from pathlib import Path
@@ -102,27 +103,38 @@ class ProtectedResourceBundle:
     @classmethod
     def _extract_bundle(cls, package_path: Path, secret_module_path: Path) -> tuple[Path, bytes | None]:
         zip_bytes = cls._decrypt_package_to_zip_bytes(package_path, secret_module_path)
-        digest = hashlib.sha256(package_path.read_bytes()).hexdigest()[:16]
-        extract_root = Path(tempfile.gettempdir()) / f"qyro_protected_{digest}"
         encrypted_secrets_payload = cls._read_embedded_secrets_payload(zip_bytes)
+        extract_root = Path(tempfile.mkdtemp(prefix="qyro_protected_"))
 
-        marker = extract_root / ".ok"
-        if marker.exists():
-            return extract_root, encrypted_secrets_payload
+        try:
+            with zipfile.ZipFile(io.BytesIO(zip_bytes), "r") as archive:
+                for member in archive.infolist():
+                    normalized_name = member.filename.strip("/")
+                    if not normalized_name or member.is_dir():
+                        continue
+                    if normalized_name == _SECRETS_ARCHIVE_PATH:
+                        continue
+                    if normalized_name.startswith(".qyro/"):
+                        continue
 
-        extract_root.mkdir(parents=True, exist_ok=True)
-        with zipfile.ZipFile(io.BytesIO(zip_bytes), "r") as archive:
-            for member in archive.infolist():
-                normalized_name = member.filename.strip("/")
-                if not normalized_name:
-                    continue
-                if normalized_name == _SECRETS_ARCHIVE_PATH:
-                    continue
-                if normalized_name.startswith(".qyro/"):
-                    continue
-                archive.extract(member, extract_root)
+                    relative_path = Path(normalized_name)
+                    if (
+                        "\\" in normalized_name
+                        or relative_path.is_absolute()
+                        or ".." in relative_path.parts
+                        or not relative_path.parts
+                        or relative_path.parts[0] not in {"settings", "resources"}
+                    ):
+                        raise ValueError("Protected resources package contains an invalid path")
 
-        marker.write_text("ok", encoding="utf-8")
+                    destination = extract_root / relative_path
+                    destination.parent.mkdir(parents=True, exist_ok=True)
+                    with archive.open(member) as source, destination.open("wb") as target:
+                        shutil.copyfileobj(source, target)
+        except Exception:
+            shutil.rmtree(extract_root, ignore_errors=True)
+            raise
+
         return extract_root, encrypted_secrets_payload
 
     @classmethod

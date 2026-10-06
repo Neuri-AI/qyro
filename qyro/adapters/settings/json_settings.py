@@ -33,19 +33,19 @@ class JsonSettingsAdapter(ISettingsPort):
             return self._custom_settings_dir
 
         root = self._env.get_bundle_dir() if self._env.is_frozen() else self._env.get_root_dir()
+        possible_dirs = [
+            root / "settings",
+            root / "build" / "settings",
+            root / "src" / "main" / "settings",
+            root / "src" / "build" / "settings",
+            root,
+        ]
 
         # In development / source mode, prioritize local workspace settings
         if not self._env.is_frozen():
-            possible_dirs = [
-                root / "settings",
-                root / "build" / "settings",
-                root / "src" / "main" / "settings",
-                root / "src" / "build" / "settings",
-                root,
-            ]
-            for d in possible_dirs:
-                if d.exists() and (d / "base.json").exists():
-                    return d
+            settings_dir = self._first_valid_settings_dir(possible_dirs)
+            if settings_dir:
+                return settings_dir
 
         # When running frozen, or when local settings are absent, load protected package
         protected_root = ProtectedResourceBundle.get_extracted_root(self._env)
@@ -54,13 +54,10 @@ class JsonSettingsAdapter(ISettingsPort):
             if protected_settings.exists() and (protected_settings / "base.json").exists():
                 return protected_settings
 
-        possible_dirs = [
-            root / "settings",
-            root / "build" / "settings",
-            root / "src" / "main" / "settings",
-            root / "src" / "build" / "settings",
-            root,
-        ]
+        return self._first_valid_settings_dir(possible_dirs)
+
+    @staticmethod
+    def _first_valid_settings_dir(possible_dirs: list[Path]) -> Path | None:
         for d in possible_dirs:
             if d.exists() and (d / "base.json").exists():
                 return d
