@@ -1,1 +1,0 @@
-Bienvenido. Este texto se carga como recurso de Qyro, no como ruta relativa al directorio de trabajo.

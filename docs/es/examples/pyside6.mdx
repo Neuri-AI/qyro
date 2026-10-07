@@ -1,0 +1,775 @@
+---
+title: "Demo PySide6 paso a paso"
+description: "Recorrido del código ejecutable del demo PySide6 de Qyro Engine."
+---
+
+Esta guía documenta el código que existe en
+[examples/pyside6-cli-runtime](https://github.com/Neuri-AI/qyro-engine/tree/main/examples/pyside6-cli-runtime).
+Los bloques de Python siguientes corresponden al código ejecutable del demo.
+No leas esta página como un catálogo de archivos: síguela en orden, ejecuta
+cada interacción y relaciona el resultado visible con el servicio de Qyro que
+la hace posible.
+
+## Qué aprende cada pestaña
+
+Qyro no reemplaza Qt. PySide6 sigue creando widgets, layouts y eventos; Qyro
+resuelve las preocupaciones repetidas de arranque, configuración, recursos y
+ciclo de vida.
+
+| Capacidad | Dónde se prueba | Por qué usarla |
+| --- | --- | --- |
+| ApplicationContext y adaptador PySide6 | Ventana raíz, Hello y Context | Inicializa una sola QApplication, settings, metadata y loop. |
+| Component y lifecycle | Vistas y tarjetas | Da un orden repetible para preparar, renderizar y estilizar widgets. |
+| Props | Components, Pydux y Payloads | Entrega valores de construcción al componente hijo. |
+| Settings y recursos | Context y Resources | Evita hardcodear configuración o rutas que fallen en frozen. |
+| objectName y QSS | Cabecera, tarjetas, botones e inputs | Permite cambiar toda la identidad visual desde temas reutilizables. |
+| EngineContainer | Container | Da acceso avanzado para scripts, pruebas e integraciones. |
+| Pydux, selectores y DevTools | Pydux | Mantiene estado compartido observable y depurable. |
+| Payloads | Payloads | Comunica componentes sin referencias directas. |
+| Secretos, telemetría y bundle | Paso 11 | Configura capacidades de producción que no deben ir en la UI. |
+
+## Ruta de aprendizaje
+
+1. Ejecuta el proyecto y visita Hello para ver qué inicializó el Engine.
+2. Visita Components para distinguir props de estado mutable.
+3. Visita Resources y cambia el tema para probar rutas y QSS.
+4. Visita Context y Container para entender los dos niveles de API.
+5. Usa Pydux y DevTools antes de enviar un payload entre componentes.
+6. Termina con secretos, telemetría y el build frozen.
+
+## 1. Crear y ejecutar el proyecto
+
+La base se creó en el entorno Conda osx310 con este comando:
+
+~~~bash
+conda activate osx310
+qyro init --name pyside6-cli-runtime --target-platform desktop \
+  --binding PySide6 --app-name qyro-pyside6-demos --version 0.1.0 \
+  --author "Qyro Team" --addon pydux --yes
+~~~
+
+Para abrir el demo:
+
+~~~bash
+conda activate osx310
+cd qyro/examples/pyside6-cli-runtime
+qyro start
+~~~
+
+La estructura final es:
+
+~~~text
+pyside6-cli-runtime/
+├── main.py
+├── store.py
+├── components/
+│   ├── user_card.py
+│   ├── counter_card.py
+│   ├── profile_editor.py
+│   └── profile_preview.py
+├── views/
+│   ├── root.py
+│   ├── hello.py
+│   ├── components.py
+│   ├── resources.py
+│   ├── context.py
+│   ├── container.py
+│   ├── pydux.py
+│   └── payloads.py
+├── resources/base/
+│   ├── text/greeting.txt
+│   ├── styles/demo.qss
+│   └── themes/light.qss y dark.qss
+├── settings/
+│   └── base.json
+└── tests/test_project.py
+~~~
+
+## 2. Ventana raíz y composición de vistas
+
+### Concepto y objetivo
+
+ApplicationContext es la frontera entre la aplicación y el Engine. Al crear la
+ventana raíz, Qyro lee settings, selecciona el adaptador PySide6, crea o
+reutiliza QApplication e instala la telemetría configurada. Por eso solo la
+clase raíz hereda ApplicationContext: un widget hijo no debe crear otro Engine
+ni otra QApplication.
+
+**Prueba ahora:** abre Hello. El nombre, versión, plataforma y valor frozen se
+obtienen sin que la vista abra JSON ni consulte sys.platform.
+
+main.py conserva el orden de herencia recomendado: QMainWindow, Component y
+ApplicationContext. Durante el montaje toma tamaño y tema desde settings.
+
+~~~python
+class QyroPyside6Demos(QMainWindow, Component, ApplicationContext):
+    """Root application: it creates the layout and loads view widgets."""
+
+    def component_will_mount(self):
+        window = self.app_settings.get("window", {})
+        self.resize(window.get("width", 860), window.get("height", 580))
+        self.current_theme = self.app_settings.get("theme", "light")
+~~~
+
+El render real construye la cabecera, el botón de tema, el contenedor de tabs
+y carga los widgets de views/:
+
+~~~python
+def render(self):
+    shell = QWidget(self, objectName="appShell")
+    shell_layout = QVBoxLayout(shell, spacing=14)
+    shell_layout.setContentsMargins(20, 18, 20, 18)
+
+    header = QFrame(shell, objectName="appHeader")
+    header_layout = QHBoxLayout(header)
+    header_layout.setContentsMargins(18, 14, 18, 14)
+
+    copy_layout = QVBoxLayout(spacing=4)
+    copy_layout.setContentsMargins(0, 0, 0, 0)
+    copy_layout.addWidget(QLabel("Qyro Engine Lab", objectName="appTitle"))
+    copy_layout.addWidget(
+        QLabel("PySide6 · Components · Resources · Pydux",
+               objectName="appSubtitle")
+    )
+
+    self.theme_toggle = QPushButton(
+        header, objectName="themeToggle", clicked=self.toggle_theme
+    )
+
+    header_layout.addLayout(copy_layout)
+    header_layout.addStretch()
+    header_layout.addWidget(self.theme_toggle)
+
+    self.tabs = QTabWidget(shell)
+    shell_layout.addWidget(header)
+    shell_layout.addWidget(self.tabs)
+    self.setCentralWidget(shell)
+~~~
+
+Las pestañas se declaran como datos y después cada clase se instancia como un
+widget hijo de QTabWidget. context, title y detail son props de Qyro; parent
+es el argumento nativo de Qt. El demo conserva el contexto inyectado para
+mostrar metadata, plataforma y adaptadores, pero usa helpers de Component
+cuando basta con settings, recursos o el modo frozen.
+
+~~~python
+page_specs = (
+    ("Hello", HelloView, "Hello, World!",
+     "La estructura se creó con qyro init."),
+    ("Components", ComponentsView, "Componentes y props",
+     "Los keywords no nativos pasan a props; no vuelven reactivo al componente."),
+    ("Resources", ResourcesView, "Recursos source/frozen",
+     "Qyro resuelve rutas sin depender del directorio actual."),
+    ("Context", ContextView, "ApplicationContext y settings",
+     "Los settings son configuración de arranque; no son estado mutable de UI."),
+    ("Container", ContainerView, "API profunda: EngineContainer",
+     "El contenedor Headless sirve para scripts y pruebas, sin crear otra QApplication."),
+    ("Pydux", PyduxView, "Estado compartido con Pydux",
+     "CounterCard recibe title por props y se conecta por sí mismo al selector de Pydux."),
+    ("Payloads", PayloadsView, "Payloads entre componentes",
+     "ProfileEditor despacha un payload y ProfilePreview se actualiza por el selector, sin una referencia directa entre ambos."),
+)
+self.views = []
+for tab_title, view_type, title, detail in page_specs:
+    view = view_type(
+        parent=self.tabs, context=self, title=title, detail=detail
+    )
+    self.views.append(view)
+    self.tabs.addTab(view, tab_title)
+self.apply_theme()
+~~~
+
+## 3. Widget base de las páginas
+
+### Concepto y objetivo
+
+Component no reconcilia árboles de widgets como un framework web. Organiza un
+lifecycle síncrono:
+
+~~~text
+constructor nativo -> component_will_mount -> render
+-> component_did_mount -> set_styles -> on_resize
+~~~
+
+Root aprovecha ese orden: construye título y layout una vez; las vistas hijas
+añaden contenido cuando el layout ya existe.
+
+**Prueba ahora:** cambia de pestaña. Todas comparten estructura visual sin
+duplicar código, pero cada una compone sus propios widgets.
+
+Cada página hereda de Root, definido en views/root.py. Es un QWidget y
+Component: recibe context, title y detail por props y crea el layout común.
+Los helpers de Component conectan la vista al Engine compartido y reducen el
+código cuando no hace falta una capacidad exclusiva de ApplicationContext.
+
+~~~python
+from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget
+from qyro.client.component import Component
+
+
+class Root(QWidget, Component):
+    """Common page shell with explicit context and Component helpers."""
+
+    def component_will_mount(self):
+        self.context = self.props.get("context")
+        self.title = self.props["title"]
+        self.detail = self.props["detail"]
+
+    def render(self):
+        self.setObjectName("pageRoot")
+        self.layout = QVBoxLayout(self)
+        eyebrow = QLabel(
+            self.__class__.__name__.replace("View", "").upper(),
+            self,
+            objectName="eyebrow",
+        )
+        heading = QLabel(self.title, self, objectName="pageTitle")
+        detail = QLabel(
+            self.detail,
+            self,
+            objectName="pageDescription",
+            wordWrap=True,
+        )
+
+        for widget in [eyebrow, heading, detail]:
+            self.layout.addWidget(widget)
+~~~
+
+ComponentsView es una página mínima que compone dos componentes reutilizables:
+
+~~~python
+from views.root import Root
+from components import UserCard
+
+
+class ComponentsView(Root):
+    def component_did_mount(self):
+        self.layout.addWidget(UserCard(
+            parent=self,
+            name="Ada Lovelace",
+            role="Arquitecta de software",
+        ))
+        self.layout.addWidget(UserCard(
+            parent=self,
+            props={"name": "Linus Torvalds"},
+            role="Mantenedor",
+        ))
+~~~
+
+## 4. Componentes y props
+
+### Concepto y objetivo
+
+Una prop es información disponible al construir un hijo, por ejemplo un nombre
+o título. Hace al componente reutilizable, pero no es un canal reactivo:
+cambiar props después del montaje no vuelve a llamar render. El estado que
+cambia durante la ejecución se manejará con Pydux.
+
+**Prueba ahora:** abre Components y redimensiona la ventana. Las tarjetas se
+construyen con dos sintaxis de props y el rol se adapta con calc.
+
+UserCard vive en components/user_card.py. Usa props durante el montaje, crea
+sus hijos en render y responde a cambios de tamaño con calc.
+
+~~~python
+class UserCard(QFrame, Component):
+    """A reusable Qt widget whose keyword arguments become Qyro props."""
+
+    STYLES = "QFrame#card { border-radius: 12px; }"
+
+    def component_will_mount(self):
+        self.name = self.props.get("name", "Invitado")
+        self.role = self.props.get("role", "Sin rol")
+
+    def render(self):
+        self.setObjectName("card")
+        layout = QVBoxLayout(self)
+        self.name_label = QLabel(self.name, self, objectName="cardTitle")
+        self.role_label = QLabel(self.role, self, objectName="muted")
+
+        for widget in [self.name_label, self.role_label]:
+            layout.addWidget(widget)
+
+    def on_resize(self):
+        if hasattr(self, "role_label"):
+            self.role_label.setMaximumWidth(self.calc(self.width(), 90))
+~~~
+
+Props describen la construcción. Si necesitas un valor que cambie después de
+montar el widget, conéctalo a Pydux en lugar de reasignar props.
+
+## 5. Recursos y vista Resources
+
+### Concepto y objetivo
+
+En source, un archivo vive en el proyecto; en frozen puede vivir dentro del
+bundle o de un paquete protegido. get_resource abstrae esa diferencia: pide un
+nombre lógico, no construyas rutas desde cwd o desde __file__.
+
+**Prueba ahora:** abre Resources. Debe cargar greeting.txt, informar que el
+tema opcional no existe y listar el directorio text. Pulsa el botón para cargar
+un QSS como recurso.
+
+ResourcesView usa get_resource, por lo que no depende de rutas relativas ni de
+la ubicación física del bundle:
+
+~~~python
+class ResourcesView(Root):
+    def component_did_mount(self):
+        greeting = Path(self.get_resource("text/greeting.txt")
+                        ).read_text(encoding="utf-8")
+        optional = Path(self.get_resource(
+            "themes/seasonal.qss", required=False))
+        listed = sorted(
+            path.name
+            for path in self.context.container.resource_adapter.list_resources(
+                "base"
+            )
+        )
+
+        button = QPushButton(
+            "Aplicar QSS desde resources",
+            self,
+            objectName="primaryButton",
+            clicked=lambda: self.set_styles(
+                self.get_resource("styles/demo.qss")
+            ),
+        )
+
+        for widget in [
+            QLabel(greeting, self),
+            QLabel(f"Recurso opcional existe: {optional.is_file()}", self),
+            QLabel(f"Contenido de resources/text: {', '.join(listed)}", self),
+            button,
+        ]:
+            self.layout.addWidget(widget)
+~~~
+
+El recurso greeting.txt es obligatorio. seasonal.qss se consulta con
+required=False: no genera una excepción si no existe. El listado usa
+resource_adapter.list_resources("text"), que conserva las reglas de resolución
+de recursos de Qyro tanto en source como en frozen.
+
+## 6. Temas QSS y objectName
+
+### Concepto y objetivo
+
+Qt usa objectName como selector QSS. Al nombrar los widgets por su rol visual,
+por ejemplo card, primaryButton o field, un archivo de tema cambia toda la
+interfaz sin dispersar colores y bordes en clases Python.
+
+**Prueba ahora:** usa el control de la cabecera. Tabs, fondos, tarjetas, inputs
+y botones deben cambiar juntos; el naranja #EA580C se conserva como acento.
+
+Los temas están en resources/base/themes/light.qss y dark.qss. La ventana
+aplica el archivo resuelto por Qyro y cambia el texto del botón:
+
+~~~python
+def apply_theme(self):
+    self.set_styles(self.get_resource(f"themes/{self.current_theme}.qss"))
+    next_theme = "Dark" if self.current_theme == "light" else "Light"
+    self.theme_toggle.setText(f"Usar tema {next_theme}")
+
+def toggle_theme(self):
+    self.current_theme = (
+        "dark" if self.current_theme == "light" else "light"
+    )
+    self.apply_theme()
+~~~
+
+Los nombres de objeto son los selectores concretos de los QSS. Este es código
+real de components/profile_editor.py:
+
+~~~python
+self.setObjectName("card")
+title = QLabel(self.title, self, objectName="cardTitle")
+self.name_input = QLineEdit(
+    "Grace Hopper", self, objectName="field", placeholderText="Nombre"
+)
+send = QPushButton(
+    "Enviar payload",
+    self,
+    objectName="primaryButton",
+    clicked=self.send_profile,
+)
+~~~
+
+Y el tema Light usa esos IDs. El naranja de Qyro es el acento principal:
+
+~~~css
+QFrame#card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+}
+QLineEdit#field:focus { border: 2px solid #ea580c; }
+QPushButton#primaryButton {
+    background: #ea580c;
+    border: 0;
+    border-radius: 8px;
+    color: #ffffff;
+}
+QPushButton#primaryButton:hover { background: #c2410c; }
+~~~
+
+El tema Dark cambia superficies y contraste, pero mantiene los controles
+primarios en #EA580C.
+
+## 7. Context, settings y Container
+
+### Concepto y objetivo
+
+Settings describe el arranque y distribución: identidad, binding, icono y
+opciones propias. No es el estado mutable de la interfaz. ApplicationContext
+ofrece helpers para el uso cotidiano; EngineContainer expone adaptadores y
+use cases para scripts, pruebas o integraciones avanzadas.
+
+**Prueba ahora:** Context muestra metadata, execution_mode y settings. Después
+abre Container: crea un EngineContainer Headless sin abrir otra interfaz.
+
+La vista Hello lee metadata, plataforma y modo desde el contexto que recibió
+como prop:
+
+~~~python
+class HelloView(Root):
+    def component_did_mount(self):
+        settings = self.app_settings
+        self.layout.addWidget(QLabel(
+            f"App: {settings.get('app_name')} v{settings.get('version')}",
+            self,
+        ))
+        self.layout.addWidget(QLabel(
+            f"Platform: {PlatformDetector.get_platform().value} | "
+            f"frozen: {self.is_frozen}",
+            self,
+        ))
+~~~
+
+ContainerView muestra un EngineContainer Headless aislado, adecuado para
+scripts y pruebas:
+
+~~~python
+isolated = EngineContainer(
+    framework_name="Headless",
+    custom_root=Path(__file__).parents[1],
+    enable_sentry=False,
+)
+metadata = isolated.load_settings_use_case.execute()
+path = isolated.resolve_resource_use_case.execute("text/greeting.txt")
+~~~
+
+En widgets comunes prefiere app_settings, is_frozen y get_resource heredados de
+Component. El contenedor es una API más profunda.
+
+### Helpers de Component y helpers globales
+
+Component ya conoce el Engine compartido. Aunque las vistas del demo conservan
+ApplicationContext como prop, una vista puede llamar self.app_settings,
+self.is_frozen y self.get_resource sin depender de self.context. El demo usa
+ambos patrones para que puedas compararlos.
+
+El store no es un Component, así que usa los helpers procedurales equivalentes.
+Este código real de store.py convierte información del runtime en una acción
+Pydux:
+
+~~~python
+from qyro import is_frozen, load_build_settings
+
+def refresh_runtime_info():
+    """Build a Pydux action from Qyro's procedural runtime helpers."""
+    settings = load_build_settings()
+    return runtime_slice.actions.set_info({
+        "app_name": settings.get("app_name", "Qyro Application"),
+        "theme": settings.get("theme", "sin tema"),
+        "is_frozen": is_frozen(),
+    })
+~~~
+
+RuntimeInfoCard se suscribe a esa rama, despacha refresh_runtime_info al
+montarse y muestra el resultado en la pestaña Context. Así puedes comprobar
+que los helpers se pueden combinar con Pydux sin que RuntimeInfoCard dependa de
+la ventana raíz:
+
+~~~python
+class RuntimeInfoCard(QFrame, Component, Reactive):
+    def component_will_mount(self):
+        self.bind_selector(store, select_runtime_info, self.update_runtime)
+
+    def component_did_mount(self):
+        store.dispatch(refresh_runtime_info())
+
+    def update_runtime(self, runtime):
+        mode = "frozen" if runtime["is_frozen"] else "source"
+        self.app_label.setText(f"Aplicación: {runtime['app_name']}")
+        self.mode_label.setText(f"Modo detectado por is_frozen(): {mode}")
+        self.theme_label.setText(f"Tema desde settings: {runtime['theme']}")
+~~~
+
+**Prueba ahora:** abre Context. La tarjeta Runtime leído con helpers Qyro debe
+mostrar el nombre de aplicación, el tema y si estás en source o frozen.
+
+## 8. Store, CounterCard y DevTools
+
+### Concepto y objetivo
+
+CounterCard no recibe el contador por prop porque ese valor cambia mientras la
+aplicación está abierta. El botón despacha una acción; el reducer calcula el
+siguiente estado y el selector entrega al componente solamente lo que necesita.
+
+**Prueba ahora:** pulsa +1 y -1. La etiqueta cambia por la suscripción
+Reactive, no porque el padre modifique CounterCard directamente.
+
+El código completo de store.py contiene ambos slices y activa DevTools:
+
+~~~python
+counter_slice = create_slice(
+    name="counter",
+    initial_state={"value": 0},
+    reducers={
+        "increment": lambda state, action: state.update(
+            value=state["value"] + 1
+        ),
+        "decrement": lambda state, action: state.update(
+            value=state["value"] - 1
+        ),
+    },
+)
+
+profile_slice = create_slice(
+    name="profile",
+    initial_state={"name": "Sin seleccionar", "role": "—"},
+    reducers={
+        "set_profile": lambda state, action: state.update(**action.payload),
+    },
+)
+
+RUNNING_FROZEN = is_frozen()
+
+store = configure_store(
+    {"counter": counter_slice, "profile": profile_slice},
+    devtools=not RUNNING_FROZEN,
+    inspector_auto_start=not RUNNING_FROZEN,
+)
+
+select_counter_label = create_selector(
+    lambda state: state["counter"]["value"],
+    lambda value: f"Contador compartido: {value}",
+)
+
+select_profile = lambda state: state["profile"]
+~~~
+
+CounterCard es el componente propietario tanto de la suscripción como de los
+botones que despachan las acciones:
+
+~~~python
+class CounterCard(QFrame, Component, Reactive):
+    STYLES = UserCard.STYLES
+
+    def component_will_mount(self):
+        self.title = self.props.get("title", "Contador")
+        self.bind_selector(
+            store, select_counter_label, self.update_counter_label
+        )
+
+    def render(self):
+        self.setObjectName("card")
+        layout = QVBoxLayout(self)
+        title = QLabel(self.title, self, objectName="cardTitle")
+        self.counter_label = QLabel(
+            "Preparando store…", self, objectName="muted"
+        )
+        plus = QPushButton(
+            "+1",
+            self,
+            objectName="primaryButton",
+            clicked=lambda: store.dispatch(
+                counter_slice.actions.increment()
+            ),
+        )
+        layout.addWidget(title)
+        layout.addWidget(self.counter_label)
+        layout.addWidget(plus)
+~~~
+
+PyduxView obtiene la URL real del inspector y presenta el enlace:
+
+~~~python
+inspector = getattr(store, "inspector", None)
+inspector_url = (
+    inspector.base_url if inspector else "http://127.0.0.1:8765"
+)
+message = QLabel(
+    f'<a href="{inspector_url}">Abre Pydux DevTools en {inspector_url}</a> '
+    "para ver cada dispatch y usar time travel.",
+    self,
+    objectName="devtoolsLink",
+    openExternalLinks=True,
+    wordWrap=True,
+)
+~~~
+
+Pulsa +1 o -1 y abre el enlace en source. Normalmente el inspector está en
+http://127.0.0.1:8765; si el puerto está ocupado, Pydux elige uno disponible.
+En una aplicación frozen, RUNNING_FROZEN desactiva tanto DevTools como el
+servidor web; la vista muestra un mensaje en lugar del enlace.
+
+En DevTools revisa el tipo de acción, el estado previo y posterior, y el
+control de time travel para volver temporalmente a una transición anterior.
+
+## 9. Payloads entre dos componentes
+
+### Concepto y objetivo
+
+El store es el contrato entre emisor y receptor. ProfileEditor conoce el
+formato del payload, pero no ProfilePreview; este conoce el selector, pero no
+quién produjo el cambio. Así cualquiera puede reutilizarse o probarse sin el
+otro.
+
+**Prueba ahora:** escribe nombre y rol, pulsa Enviar payload y observa la
+tarjeta receptora. DevTools debe mostrar profile/set_profile y el objeto.
+
+ProfileEditor no tiene una referencia a ProfilePreview. Solo crea el payload y
+despacha una acción:
+
+~~~python
+def send_profile(self):
+    payload = {
+        "name": self.name_input.text().strip() or "Sin nombre",
+        "role": self.role_input.text().strip() or "Sin rol",
+    }
+    store.dispatch(profile_slice.actions.set_profile(payload))
+~~~
+
+ProfilePreview, definido en components/profile_preview.py, se conecta al
+selector de perfil y actualiza sus labels:
+
+~~~python
+class ProfilePreview(QFrame, Component, Reactive):
+    STYLES = UserCard.STYLES
+
+    def component_will_mount(self):
+        self.title = self.props.get("title", "Vista previa")
+        self.bind_selector(store, select_profile, self.update_profile)
+
+    def update_profile(self, profile):
+        if hasattr(self, "name_label"):
+            self.name_label.setText(f"Nombre: {profile['name']}")
+            self.role_label.setText(f"Rol: {profile['role']}")
+~~~
+
+La vista que los compone es igualmente directa:
+
+~~~python
+class PayloadsView(Root):
+    def component_did_mount(self):
+        self.profile_editor = ProfileEditor(
+            parent=self, title="Componente emisor"
+        )
+        self.profile_preview = ProfilePreview(
+            parent=self, title="Componente receptor"
+        )
+        self.layout.addWidget(self.profile_editor)
+        self.layout.addWidget(self.profile_preview)
+
+    def cleanup(self):
+        self.profile_preview.component_will_unmount()
+~~~
+
+Escribe un nombre y un rol, pulsa Enviar payload y observa la tarjeta
+receptora. En DevTools aparecerá profile/set_profile con el objeto enviado.
+
+## 10. Limpieza de suscripciones e inspector
+
+### Concepto y objetivo
+
+Component no ejecuta component_will_unmount automáticamente cuando Qt destruye
+una ventana. Las vistas reactivas exponen cleanup y la raíz lo llama desde
+closeEvent. Esto evita que una suscripción intente actualizar un widget ya
+destruido.
+
+La ventana raíz limpia las suscripciones de las vistas y detiene el inspector
+al cerrarse:
+
+~~~python
+def closeEvent(self, event):
+    for view in getattr(self, "views", []):
+        cleanup = getattr(view, "cleanup", None)
+        if callable(cleanup):
+            cleanup()
+    inspector = getattr(store, "inspector", None)
+    if inspector:
+        inspector.stop()
+    super().closeEvent(event)
+~~~
+
+## 11. Secretos, telemetría y ejecución frozen
+
+### Concepto y objetivo
+
+Estas capacidades de Qyro se prueban mediante configuración y build, no
+mostrando credenciales en un QLabel. Mantenerlas fuera de la UI evita exponer
+datos sensibles y conserva la misma API entre source y frozen.
+
+### Secretos y recursos protegidos
+
+No versiones secretos reales. Usa settings/secrets.json solo en desarrollo
+local y lee exclusivamente el valor que necesites:
+
+~~~python
+api_url = self.app_settings.get("api_url")
+~~~
+
+Para probar protección de recursos, configura resource_protection y ejecuta:
+
+~~~bash
+qyro build
+~~~
+
+No fabriques archivos .qyro manualmente: la CLI genera el bundle protegido,
+el secreto de runtime y el payload cifrado. Después abre el artefacto y repite
+Resources y Context. Deben seguir funcionando porque usan get_resource y
+app_settings, no rutas físicas.
+
+### Telemetría
+
+ApplicationContext instala la telemetría durante el arranque. Para probar
+Sentry, instala el addon y usa un DSN de prueba solo en configuración local:
+
+~~~bash
+qyro init --name mi-app --binding PySide6 --addon sentry-sdk
+~~~
+
+~~~json
+{
+  "sentry_dsn": "https://public@example.ingest.sentry.io/123"
+}
+~~~
+
+Sin DSN, el Engine instala el hook de consola. No llames sentry_sdk.init desde
+render: es un servicio global que debe inicializarse una sola vez.
+
+## 12. Verificación guiada
+
+La prueba headless comprueba settings y recursos sin abrir una interfaz:
+
+~~~bash
+conda activate osx310
+cd qyro/examples/pyside6-cli-runtime
+pytest
+~~~
+
+Para revisar visualmente el demo:
+
+1. Ejecuta qyro start y confirma metadata y plataforma en Hello.
+2. Redimensiona Components y revisa que las tarjetas conservan su estructura.
+3. En Resources carga greeting.txt y aplica el QSS de recurso.
+4. Alterna Light/Dark desde la cabecera.
+5. En Context revisa settings; en Container revisa los adaptadores Headless.
+6. En Pydux pulsa +1 y -1; abre DevTools e inspecciona el historial.
+7. En Payloads envía nombre y rol y comprueba el receptor y el payload.
+8. Cierra la ventana: las suscripciones y el inspector se limpian.
+
+Consulta también [Componentes](/es/components), [Recursos](/es/resources),
+[ApplicationContext](/es/application-context), [Pydux](/es/pydux) y
+[Recursos protegidos](/es/protected-resources).

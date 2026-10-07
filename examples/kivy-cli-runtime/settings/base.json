@@ -1,0 +1,11 @@
+{
+    "app_name": "Qyro Kivy Demos",
+    "author": "Qyro Team",
+    "entry_point": "main.py",
+    "addons": ["pydux"],
+    "version": "0.1.0",
+    "binding": "Kivy",
+    "hidden_imports": ["__future__"],
+    "window": {"width": 900, "height": 620},
+    "theme": "light"
+}

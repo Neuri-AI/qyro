@@ -1,0 +1,60 @@
+{
+    "release": true,
+    "environment": "development",
+    "bundle": {
+        "dmg": {
+            "window": {
+                "x": 200,
+                "y": 120
+            },
+            "window_size": {
+                "width": 660,
+                "height": 420
+            },
+            "icon_size": 100,
+            "app_position": {
+                "x": 160,
+                "y": 200
+            },
+            "applications_position": {
+                "x": 510,
+                "y": 200
+            },
+            "background": "resources/mac/release/dmg-background.png"
+        },
+        "extra_files": [
+            "README.md",
+            {
+                "source": "README.md",
+                "destination": "README.md"
+            }
+        ],
+        "nsis": {
+            "icons": {
+                "install": "resources/base/icons/install.ico",
+                "uninstall": "resources/base/icons/uninstall.ico"
+            },
+            "welcome_bitmap": "",
+            "install_location": "programfiles64",
+            "execution_level": "highest"
+        }
+    },
+    "sign": {
+        "windows": {
+            "certificate": "src/sign/windows/certificate.pfx",
+            "timestamp_server": "http://timestamp.digicert.com",
+            "description": "qyro-pyside6-demos",
+            "url": "https://example.com"
+        },
+        "mac": {
+            "identity": "Developer ID Application: Your Name (TEAMID)",
+            "entitlements": "src/sign/mac/entitlements.plist",
+            "target_architecture": "universal2",
+            "notary": {
+                "enabled": true,
+                "staple": true,
+                "assess_gatekeeper": true
+            }
+        }
+    }
+}

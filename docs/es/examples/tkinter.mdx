@@ -1,0 +1,132 @@
+---
+title: "Demo Tkinter"
+description: "Aplicación Tkinter generada con Qyro CLI que prueba contexto, recursos, componentes y Pydux."
+---
+
+El proyecto [examples/tkinter-cli-runtime](https://github.com/Neuri-AI/qyro-engine/tree/main/examples/tkinter-cli-runtime)
+adapta el recorrido de PySide6 y Kivy a widgets nativos de Tkinter. Se creó con
+la CLI de Qyro.
+
+## Crear y ejecutar
+
+~~~bash
+conda activate osx310
+qyro init --name tkinter-cli-runtime --target-platform desktop \
+  --binding Tkinter --app-name qyro-tkinter-demos --version 0.1.0 \
+  --author "Qyro Team" --addon pydux --yes
+cd qyro/examples/tkinter-cli-runtime
+qyro start
+~~~
+
+La fase de Poetry puede requerir permisos para su caché. El demo se valida con
+las dependencias ya disponibles en `osx310`.
+
+## Recorrido
+
+| Pestaña | Capacidad |
+| --- | --- |
+| Hello | `ApplicationContext`, metadata y helpers. |
+| Components | Props en widgets reutilizables. |
+| Resources | `get_resource`, recurso opcional y `list_resources`. |
+| Context | Settings, `is_frozen`, contexto y helpers → Pydux. |
+| Container | `EngineContainer` Headless aislado. |
+| Pydux | Selector, acciones, `Reactive` y DevTools. |
+| Payloads | Datos entre componentes sin referencias directas. |
+
+La raíz usa el loop nativo de Tkinter:
+
+~~~python
+class QyroTkinterDemos(tk.Tk, Component, ApplicationContext):
+    def component_will_mount(self):
+        self.geometry("980x680")
+        self.current_theme = self.app_settings.get("theme", "light")
+        self.protocol("WM_DELETE_WINDOW", self.close_application)
+
+if __name__ == "__main__":
+    QyroTkinterDemos().mainloop()
+~~~
+
+## Vistas, props y tema
+
+`main.py` crea una barra de botones Tkinter y un contenedor de vistas; así no
+depende del estilo Aqua de `ttk.Notebook`. Las páginas viven en `views/pages.py`
+y los widgets reutilizables en `components/cards.py`.
+
+~~~python
+view = view_type(self.tab_content, context=self, title=title, detail=detail)
+self.views.append(view)
+self.tab_buttons.append(button)
+self.views.append(view)
+~~~
+
+Los keywords no nativos pasan a `props`:
+
+~~~python
+InfoCard(self, title="Props directas",
+         message="name='Ada Lovelace' · role='Arquitecta de software'")
+~~~
+
+Las props describen construcción; no son estado reactivo. Para cambios usa el
+store. Tkinter no usa QSS: `theme.py` concentra tokens y `apply_theme` configura
+`bg`, `fg`, inputs y botones. La pestaña activa usa naranja `#EA580C` y el
+selector Light/Dark actualiza todas las vistas.
+
+## Recursos, contexto y container
+
+Las vistas reciben `context` explícitamente y también usan helpers para reducir
+prop drilling:
+
+~~~python
+greeting = Path(self.get_resource("text/greeting.txt")).read_text(encoding="utf-8")
+listed = sorted(path.name for path in self.app_context.container.resource_adapter.list_resources("text"))
+settings = self.app_settings
+frozen = self.is_frozen
+~~~
+
+`ContainerView` crea un `EngineContainer` con `framework_name="Headless"` para
+inspeccionar adapters y metadata sin depender de la ventana.
+
+## Pydux, DevTools y payloads
+
+El inspector solo se inicia fuera de frozen:
+
+~~~python
+RUNNING_FROZEN = is_frozen()
+store = configure_store(
+    {"counter": counter_slice, "profile": profile_slice, "runtime": runtime_slice},
+    devtools=not RUNNING_FROZEN,
+    inspector_auto_start=not RUNNING_FROZEN,
+)
+~~~
+
+`CounterCard` hereda de `tk.Frame`, `Component` y `Reactive`; Reactive usa
+`widget.after`, el loop correcto de Tkinter. La pestaña Pydux abre DevTools y
+el cierre pasa por `close_application`, que desuscribe componentes y detiene el
+inspector.
+
+`RuntimeInfoCard` lleva datos de helpers Qyro al store:
+
+~~~python
+def refresh_runtime_info():
+    settings = load_build_settings()
+    return runtime_slice.actions.set_info({
+        "app_name": settings.get("app_name", "Qyro Application"),
+        "theme": settings.get("theme", "sin tema"),
+        "is_frozen": RUNNING_FROZEN,
+    })
+~~~
+
+En Payloads, `ProfileEditor` despacha un objeto y `ProfilePreview` escucha
+`select_profile`; ambos quedan desacoplados.
+
+## Pruebas y build
+
+~~~bash
+conda activate osx310
+cd qyro/examples/tkinter-cli-runtime
+pytest
+qyro build
+~~~
+
+La prueba headless verifica settings y recursos. Prueba la ventana en una
+sesión gráfica para comprobar estilos nativos y DevTools.

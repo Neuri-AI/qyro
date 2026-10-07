@@ -5,8 +5,7 @@
   "description": "Runtime multiplataforma, contexto de aplicación, recursos, configuración y ciclo de vida para interfaces Python.",
   "logo": {
     "light": "https://ik.imagekit.io/kummiktgaiq/ppg/qyro%20logo%20alt_2CvgPgROT.svg",
-    "dark": "https://ik.imagekit.io/kummiktgaiq/ppg/qyro%20logo%20_SqGzJHuQM.svg",
-    "href": "#"
+    "dark": "https://ik.imagekit.io/kummiktgaiq/ppg/qyro%20logo%20_SqGzJHuQM.svg"
   },
   "colors": {
     "primary": "#EA580C",
@@ -70,7 +69,9 @@
           {
             "group": "Demos",
             "pages": [
-              "es/examples"
+              "es/examples/pyside6",
+              "es/examples/kivy",
+              "es/examples/tkinter"
             ]
           },
           {
@@ -139,7 +140,7 @@
           {
             "group": "Demos",
             "pages": [
-              "en/examples"
+              "en/examples/pyside6"
             ]
           },
           {

@@ -1,0 +1,186 @@
+---
+title: "Demo Kivy"
+description: "Aplicación Kivy generada con Qyro CLI que prueba contexto, recursos, componentes y Pydux."
+---
+
+Este demo adapta las capacidades del recorrido PySide6 a widgets y layouts
+nativos de Kivy. El proyecto vive en
+[examples/kivy-cli-runtime](https://github.com/Neuri-AI/qyro-engine/tree/main/examples/kivy-cli-runtime)
+y fue creado con la CLI, no manualmente.
+
+## 1. Crear y abrir
+
+~~~bash
+conda activate osx310
+qyro init --name kivy-cli-runtime --target-platform desktop \
+  --binding Kivy --app-name qyro-kivy-demos --version 0.1.0 \
+  --author "Qyro Team" --addon pydux --yes
+
+cd qyro/examples/kivy-cli-runtime
+qyro start
+~~~
+
+La fase automática de instalación de la CLI puede requerir permisos para la
+caché de Poetry. El demo se validó con los paquetes ya instalados en osx310:
+Qyro Engine, Kivy y Pydux.
+
+## 2. Qué probar
+
+| Pestaña | Capacidad |
+| --- | --- |
+| Hello | ApplicationContext, metadata y helpers de Component. |
+| Components | Props en widgets reutilizables. |
+| Resources | get_resource, recurso opcional y list_resources. |
+| Context | Settings, is_frozen, contexto inyectado y helpers que actualizan Pydux. |
+| Container | EngineContainer Headless. |
+| Pydux | CounterCard, selector, acciones y DevTools. |
+| Payloads | ProfileEditor y ProfilePreview desacoplados por el store. |
+
+La ventana raíz combina App, Component y ApplicationContext:
+
+~~~python
+class QyroKivyDemos(App, Component, ApplicationContext):
+    def component_will_mount(self):
+        window = self.app_settings.get("window", {})
+        if Window:
+            Window.size = (
+                window.get("width", 900),
+                window.get("height", 620),
+            )
+            Window.minimum_size = (720, 500)
+        self.current_theme = self.app_settings.get("theme", "light")
+
+    def build(self):
+        return self.render()
+~~~
+
+Kivy controla build, on_start, on_stop y su loop. Component organiza el
+montaje de widgets, mientras ApplicationContext prepara settings, recursos y
+el adaptador de framework.
+
+## 3. Vistas y componentes
+
+main.py crea TabbedPanelItem y añade una vista Kivy a cada pestaña. Las páginas
+viven en views/pages.py; las piezas reutilizables en components/cards.py.
+
+~~~python
+view = view_type(context=self, title=title, detail=detail)
+self.views.append(view)
+tab.add_widget(view)
+tabs.add_widget(tab)
+~~~
+
+DemoView hereda de BoxLayout y Component. Las vistas reciben context para
+metadata y adaptadores, pero también usan los helpers heredados:
+
+~~~python
+greeting = Path(self.get_resource("text/greeting.txt")).read_text(
+    encoding="utf-8"
+)
+settings = self.app_settings
+frozen = self.is_frozen
+~~~
+
+Usa props para valores de construcción, como title. No esperes que modificar
+props vuelva reactivo el widget; para estado que cambia utiliza Pydux.
+
+## 4. Recursos y tema
+
+ResourcesView usa el resolver y el listado oficial del adaptador:
+
+~~~python
+optional = Path(self.get_resource("themes/seasonal.kv", required=False))
+listed = sorted(
+    path.name
+    for path in self.app_context.container.resource_adapter.list_resources(
+        "text"
+    )
+)
+~~~
+
+Kivy no usa QSS ni objectName como Qt. Para conservar la intención visual del
+demo PySide6, `theme.py` define tokens de color y `ThemedCard` dibuja el fondo
+redondeado con el canvas nativo de Kivy. El tema se propaga explícitamente a
+las vistas y componentes.
+
+~~~python
+with self.canvas.before:
+    self._card_color = Color(*tokens("light")["surface"])
+    self._card_background = RoundedRectangle(radius=[dp(12)])
+
+def apply_theme(self, theme_name):
+    palette = tokens(theme_name)
+    self._card_color.rgba = palette["surface"]
+~~~
+
+El selector Light/Dark actualiza `Window.clearcolor`, la cabecera, tarjetas,
+inputs y botones. Es la adaptación Kivy del QSS y los object names de Qt.
+
+## 5. Pydux, payloads y DevTools
+
+El store habilita DevTools únicamente fuera de frozen:
+
+~~~python
+RUNNING_FROZEN = is_frozen()
+store = configure_store(
+    {
+        "counter": counter_slice,
+        "profile": profile_slice,
+        "runtime": runtime_slice,
+    },
+    devtools=not RUNNING_FROZEN,
+    inspector_auto_start=not RUNNING_FROZEN,
+)
+~~~
+
+CounterCard hereda de BoxLayout, Component y Reactive. Reactive programa las
+actualizaciones en Clock, que es el loop de Kivy. En Pydux pulsa +1 o -1 y usa
+el botón **Abrir Pydux DevTools** para abrir el inspector local. En un bundle
+frozen se muestra una tarjeta explicando que el inspector se desactivó.
+
+La pestaña Context también demuestra que los helpers pueden alimentar estado
+reactivo sin pasar el contexto por todos los componentes:
+
+~~~python
+def refresh_runtime_info():
+    settings = load_build_settings()
+    return runtime_slice.actions.set_info({
+        "app_name": settings.get("app_name", "Qyro Application"),
+        "theme": settings.get("theme", "sin tema"),
+        "is_frozen": RUNNING_FROZEN,
+    })
+~~~
+
+`RuntimeInfoCard` se suscribe a `select_runtime_info` y despacha esa acción al
+montarse. Así el origen de los datos sigue siendo Qyro, pero el render depende
+del store, igual que en PySide6.
+
+En Payloads, ProfileEditor despacha el objeto:
+
+~~~python
+store.dispatch(profile_slice.actions.set_profile({
+    "name": self.name_input.text.strip() or "Sin nombre",
+    "role": self.role_input.text.strip() or "Sin rol",
+}))
+~~~
+
+ProfilePreview escucha select_profile y actualiza sus labels sin una referencia
+directa al emisor. Observa profile/set_profile en DevTools.
+
+## 6. Pruebas y build
+
+La prueba headless verifica settings y recursos:
+
+~~~bash
+conda activate osx310
+cd qyro/examples/kivy-cli-runtime
+pytest
+~~~
+
+La interfaz debe probarse desde una sesión gráfica con un proveedor de ventana
+Kivy disponible; un entorno CI sin display puede comprobar imports, settings y
+recursos, pero no garantiza OpenGL ni un Window real.
+
+Después de source, ejecuta qyro build. El código de recursos y settings no
+cambia entre source y frozen. Mantén secretos en settings/secrets.json local y
+no los muestres en widgets.
