@@ -36,8 +36,31 @@ class TkinterAdapter(BaseUIFrameworkAdapter):
                 self._app = None
         self._is_running = True
         if self._app and hasattr(self._app, "mainloop"):
+            self._activate_window()
             self._app.mainloop()
         return 0
+
+    def _activate_window(self) -> None:
+        """Present the first Tk window when Qyro enters its event loop.
+
+        ``qyro start`` is launched from a terminal, and macOS does not always
+        foreground a Tk process in that case.  These are no-ops on toolkits or
+        test doubles that do not implement the corresponding Tk methods.
+        """
+        if not self._app:
+            return
+        try:
+            self._app.update_idletasks()
+            self._app.deiconify()
+            self._app.lift()
+            self._app.focus_force()
+            after_idle = getattr(self._app, "after_idle", None)
+            if callable(after_idle):
+                after_idle(self._app.lift)
+        except Exception:
+            # Focus can be declined by the platform window manager; the app
+            # remains usable and should still enter its normal main loop.
+            pass
 
     def exit(self, code: int = 0) -> None:
         if self._app and hasattr(self._app, "destroy"):
