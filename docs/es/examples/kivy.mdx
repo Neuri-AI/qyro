@@ -1,127 +1,302 @@
 ---
-title: "Demo Kivy"
-description: "Aplicación Kivy generada con Qyro CLI que prueba contexto, recursos, componentes y Pydux."
+title: "Demo Kivy paso a paso"
+description: "Recorrido del código ejecutable del demo Kivy de Qyro Engine."
 ---
 
-Este demo adapta las capacidades del recorrido PySide6 a widgets y layouts
-nativos de Kivy. El proyecto vive en
-[examples/kivy-cli-runtime](https://github.com/Neuri-AI/qyro-engine/tree/main/examples/kivy-cli-runtime)
-y fue creado con la CLI, no manualmente.
+Esta guía se basa exclusivamente en
+[examples/kivy-cli-runtime](https://github.com/Neuri-AI/qyro-engine/tree/main/examples/kivy-cli-runtime). Los bloques de Python siguientes corresponden al código ejecutable del demo. No leas esta página como un catálogo de archivos: síguela en orden, ejecuta cada interacción y relaciona el resultado visible con el servicio de Qyro que la hace posible.
 
-## 1. Crear y abrir
+## Qué aprende cada pestaña
+
+| Capacidad | Dónde se prueba | |
+| --- | --- | --- |
+| Contexto, metadata y helpers | Hello / Context | `ApplicationContext`, settings y runtime. |
+| Component y props | Components | Widgets reutilizables Kivy. |
+| Recursos | Resources | Resolución source/frozen. |
+| Container | Container | `EngineContainer` Headless. |
+| Estado | Pydux / Payloads | Reactive, selectores y payloads. |
+
+## Ruta de aprendizaje
+
+1. Ejecuta Hello, Components y Resources.
+2. Cambia el tema y revisa Context/Container.
+3. Usa Pydux y envía un payload.
+4. Construye y repite Resources/Context frozen.
+
+## 1. Crear y ejecutar el proyecto
+
+Para crear la base del demo Kivy:
 
 ~~~bash
-conda activate osx310
-qyro init --name kivy-cli-runtime --target-platform desktop \
-  --binding Kivy --app-name qyro-kivy-demos --version 0.1.0 \
-  --author "Qyro Team" --addon pydux --yes
+qyro init --name kivy-cli-runtime --target-platform desktop --binding Kivy --addon pydux --yes
+~~~
 
+Para ejecutar el demo incluido en el repositorio:
+
+~~~bash
 cd qyro/examples/kivy-cli-runtime
 qyro start
 ~~~
 
-La fase automática de instalación de la CLI puede requerir permisos para la
-caché de Poetry. El demo se validó con los paquetes ya instalados en osx310:
-Qyro Engine, Kivy y Pydux.
+## 2. Ventana raíz y composición de vistas
 
-## 2. Qué probar
 
-| Pestaña | Capacidad |
-| --- | --- |
-| Hello | ApplicationContext, metadata y helpers de Component. |
-| Components | Props en widgets reutilizables. |
-| Resources | get_resource, recurso opcional y list_resources. |
-| Context | Settings, is_frozen, contexto inyectado y helpers que actualizan Pydux. |
-| Container | EngineContainer Headless. |
-| Pydux | CounterCard, selector, acciones y DevTools. |
-| Payloads | ProfileEditor y ProfilePreview desacoplados por el store. |
 
-La ventana raíz combina App, Component y ApplicationContext:
+La única clase que combina Kivy con Qyro es la raíz; lee settings, registra el
+cierre nativo y crea las siete pestañas reales.
 
 ~~~python
 class QyroKivyDemos(App, Component, ApplicationContext):
     def component_will_mount(self):
         window = self.app_settings.get("window", {})
-        if Window:
-            Window.size = (
-                window.get("width", 900),
-                window.get("height", 620),
-            )
-            Window.minimum_size = (720, 500)
+        Window.size = (window.get("width", 900), window.get("height", 620))
+        Window.bind(on_request_close=self._request_close)
         self.current_theme = self.app_settings.get("theme", "light")
-
-    def build(self):
-        return self.render()
 ~~~
 
-Kivy controla build, on_start, on_stop y su loop. Component organiza el
-montaje de widgets, mientras ApplicationContext prepara settings, recursos y
-el adaptador de framework.
+`main.py` crea `Hello`, `Components`, `Resources`, `Context`, `Container`,
+`Pydux` y `Payloads` en un `TabbedPanel`.
 
-## 3. Vistas y componentes
+La raíz guarda cada instancia en `self.views`. Luego `apply_theme` puede
+recorrerlas y `on_stop` puede solicitar su limpieza; una página no necesita
+conocer la ventana para participar. `tabs.switch_to(self.tab_items[0])` evita
+el header interno vacío de `TabbedPanel`. **Prueba ahora:** cambia de pestaña
+y alterna tema; la pestaña activa, cabecera y contenido cambian sin recrear la
+aplicación.
 
-main.py crea TabbedPanelItem y añade una vista Kivy a cada pestaña. Las páginas
-viven en views/pages.py; las piezas reutilizables en components/cards.py.
+
+### Por qué hay una sola raíz
+
+`App` es la entrada de Kivy: administra la aplicación y su ciclo de ejecución. `Component` aporta el contrato de montaje utilizado por Qyro y `ApplicationContext` expone la configuración y los servicios del Engine. La combinación ocurre en `QyroKivyDemos`; las vistas hijas no necesitan inicializar otro contexto. Eso evita que cada pestaña intente resolver por separado la configuración o administrar el runtime.
+
+El método `component_will_mount` prepara valores antes de construir la interfaz. `self.app_settings.get("window", {})` obtiene la sección de ventana o un diccionario vacío si no existe. Las llamadas `window.get` proporcionan tamaños de respaldo; `Window.size` es una propiedad de la ventana de Kivy, no una configuración inventada por Qyro. `Window.bind(on_request_close=self._request_close)` conecta el evento de cierre con la rutina de la aplicación. Finalmente, `current_theme` conserva el tema inicial, usando `light` como alternativa.
+
+### Cómo se relacionan las pestañas con sus vistas
+
+`TabbedPanel` es el contenedor visual; cada pestaña contiene una instancia de vista. `self.views` es una colección de esas instancias, no una segunda representación de la interfaz. Es útil porque el cambio de tema y la limpieza pueden recorrer los mismos objetos sin que cada vista tenga que buscar a sus hermanas. `tabs.switch_to(self.tab_items[0])` selecciona expresamente la primera pestaña creada, en vez de dejar seleccionado el elemento inicial vacío del panel.
+
+**Qué observar:** al abrir Hello y después Context, ambas páginas consultan el mismo contexto. Al alternar el tema, la aplicación modifica los widgets existentes; no reinicia Kivy ni vuelve a ejecutar `qyro init`. Si una vista no recibe el nuevo estilo, revisa su implementación de `apply_theme` y su inclusión en la colección de vistas.
+
+## 3. Widget base de las páginas
+
+
+
+`DemoView` es un `BoxLayout` Kivy y un `Component`; recibe el contexto, título
+y detalle como props.
 
 ~~~python
-view = view_type(context=self, title=title, detail=detail)
-self.views.append(view)
-tab.add_widget(view)
-tabs.add_widget(tab)
+class DemoView(BoxLayout, Component):
+    def component_will_mount(self):
+        self.orientation, self.spacing, self.padding = "vertical", dp(10), dp(16)
+        self.app_context = self.props.get("context")
+        self.title, self.detail = self.props["title"], self.props["detail"]
 ~~~
 
-DemoView hereda de BoxLayout y Component. Las vistas reciben context para
-metadata y adaptadores, pero también usan los helpers heredados:
+`render` añade los labels comunes una vez y `apply_theme` propaga el palette a
+cualquier hijo que implemente ese método. Es la composición explícita de Kivy:
+no hay árbol virtual ni reconciliación. **Prueba ahora:** compara Hello,
+Resources y Container; todas heredan el mismo shell, pero cada una añade sus
+propios widgets en `component_did_mount`.
+
+
+### Por qué crear una clase base
+
+`BoxLayout` organiza widgets hijos; en este caso, `orientation = "vertical"` los apila de arriba abajo. `spacing` establece separación y `padding` espacio interior. `dp(...)` expresa dimensiones independientes de la densidad de pantalla, una práctica habitual en Kivy para evitar depender de píxeles físicos. `Component` agrega un punto de montaje consistente, pero no reemplaza el comportamiento del layout.
+
+`self.props` contiene los datos entregados al crear la vista. La clave `context` da acceso al objeto raíz; `title` y `detail` identifican la página y explican su propósito. El uso de corchetes para estas últimas claves implica que son obligatorias para este demo: si faltan, se detecta el error en vez de mostrar silenciosamente una página incompleta.
+
+### Montaje no significa reactividad automática
+
+La implementación agrega etiquetas y widgets de manera explícita. `render` describe el contenido inicial y `component_did_mount` permite que las vistas especializadas añadan su contenido una vez montadas. No interpretes `render` como el `render` de React: el demo no mantiene un árbol virtual que reconcilie automáticamente las diferencias. Para cambiar valores en pantalla se actualizan las propiedades de los widgets o se usan las suscripciones de Pydux que veremos después.
+
+**Qué observar:** Hello, Resources y Container comparten la misma presentación básica sin duplicar su estructura. Esta reutilización es composición y herencia de widgets, no una señal de que las tres vistas compartan estado mutable.
+
+## 4. Componentes y props
+
+
+
+`InfoCard` demuestra props de construcción; no son estado reactivo. El demo
+usa los atajos por keyword (`title=`, `message=`, `context=`). `Component`
+también acepta `props={...}`, pero el demo Kivy no usa esa variante.
 
 ~~~python
-greeting = Path(self.get_resource("text/greeting.txt")).read_text(
-    encoding="utf-8"
-)
-settings = self.app_settings
-frozen = self.is_frozen
+class InfoCard(ThemedCard, Component):
+    def component_will_mount(self):
+        self.title = self.props.get("title", "Información")
+        self.message = self.props.get("message", "")
 ~~~
 
-Usa props para valores de construcción, como title. No esperes que modificar
-props vuelva reactivo el widget; para estado que cambia utiliza Pydux.
+<Warning>
+El wrapper de `Component` separa `parent` y convierte los demás keywords en
+props antes de invocar el constructor del widget. Esto funciona para los
+valores de aplicación del demo, pero no pases propiedades nativas de Kivy como
+`orientation`, `size_hint` o `padding` al constructor de un `Component`: el
+demo las asigna en `component_will_mount`, como hace `InfoCard`. En Qt ese
+wrapper está alineado con el argumento nativo `parent`; no asumas que todos
+los keywords nativos se transfieren entre toolkits.
+</Warning>
 
-## 4. Recursos y tema
+`ComponentsView` instancia dos `InfoCard` con contenido distinto. El dato se
+lee antes de renderizar; cambiarlo después no actualiza los labels. Esa es la
+frontera que el demo quiere mostrar: usa props para construcción y Pydux para
+valores que cambian con interacción.
 
-ResourcesView usa el resolver y el listado oficial del adaptador:
+
+### Cómo viaja la información al componente
+
+Piensa en `InfoCard` como una tarjeta configurable. El padre decide el título y el mensaje; el hijo lee esos valores durante `component_will_mount` y construye su contenido. `self.props.get("title", "Información")` permite un título predeterminado; `self.props.get("message", "")` permite que el mensaje esté vacío. Esta decisión es útil para datos que no deben cambiar después de crear la tarjeta.
+
+El aviso sobre keywords nativos es especialmente importante para quien viene de Kivy puro. En un widget Kivy normal es común pasar opciones visuales al constructor. Aquí, el wrapper de `Component` interpreta los keywords de aplicación como props. Por eso este demo asigna `orientation`, `size_hint` o `padding` dentro del ciclo de montaje cuando corresponda. No extrapoles sin comprobarlo el comportamiento del constructor de Qt al de Kivy.
+
+### Cuándo usar props y cuándo usar Pydux
+
+Usa props para describir **qué tarjeta crear**; usa el store cuando varios componentes necesitan observar **un valor que evoluciona**. Mutar posteriormente el diccionario de props no garantiza que se vuelvan a construir los `Label` ya existentes. La demostración del contador y del perfil separa precisamente esos dos casos.
+
+**Qué observar:** en Components aparecen dos tarjetas de la misma clase con textos diferentes. Su aspecto compartido viene de `InfoCard` y `ThemedCard`; sus mensajes distintos vienen de los argumentos entregados al crearlas.
+
+## 5. Recursos y vista Resources
+
+
+
+En source, un archivo vive bajo `resources/`; en frozen puede vivir dentro del
+bundle o de un paquete protegido. `get_resource` abstrae esa diferencia: pide
+un nombre lógico, no construyas rutas desde `cwd` ni desde `__file__`.
+
+**Prueba ahora:** abre **Resources**. Debe mostrar el contenido de
+`greeting.txt`, informar que `seasonal.kv` no existe y listar el directorio
+`text`. No hay un botón QSS equivalente: Kivy usa los tokens y canvas que se
+explican en la siguiente sección.
+
+`ResourcesView` usa `get_resource` y el adaptador de recursos del contexto;
+por eso no depende de la ubicación física del bundle:
 
 ~~~python
-optional = Path(self.get_resource("themes/seasonal.kv", required=False))
-listed = sorted(
-    path.name
-    for path in self.app_context.container.resource_adapter.list_resources(
-        "text"
-    )
-)
+class ResourcesView(DemoView):
+    def component_did_mount(self):
+        greeting = Path(self.get_resource("text/greeting.txt")).read_text(
+            encoding="utf-8"
+        )
+        optional = Path(self.get_resource(
+            "themes/seasonal.kv", required=False
+        ))
+        listed = sorted(
+            path.name
+            for path in self.app_context.container.resource_adapter
+            .list_resources("text")
+        )
+        self.add_widget(InfoCard(
+            title="get_resource + list_resources",
+            message=(
+                f"{greeting}\nOpcional existe: {optional.is_file()}\n"
+                f"resources/text: {', '.join(listed)}"
+            ),
+        ))
 ~~~
 
-Kivy no usa QSS ni objectName como Qt. Para conservar la intención visual del
-demo PySide6, `theme.py` define tokens de color y `ThemedCard` dibuja el fondo
-redondeado con el canvas nativo de Kivy. El tema se propaga explícitamente a
-las vistas y componentes.
+`greeting.txt` es obligatorio: si falta, el demo debe fallar para revelar un
+paquete incompleto. `seasonal.kv` se consulta con `required=False`, por lo que
+su ausencia no rompe la UI y queda visible en la tarjeta. El listado delega al
+`resource_adapter`, conservando la política de resolución de Qyro en source y
+frozen. Tras ejecutar `qyro build`, repite la pestaña: debe conservar los tres
+resultados sin depender de una ruta relativa del proyecto.
+
+
+### Leer el ejemplo línea por línea
+
+`self.get_resource("text/greeting.txt")` solicita una ruta al resolvedor de Qyro; después `Path(...).read_text(encoding="utf-8")` abre el archivo como texto. Es importante distinguir las dos operaciones: Qyro encuentra el recurso y la biblioteca estándar de Python lee su contenido. El nombre lógico del recurso no debe confundirse con una ruta absoluta del sistema operativo.
+
+La segunda consulta usa `required=False` porque `themes/seasonal.kv` es deliberadamente opcional. `Path(...).is_file()` permite mostrar en la tarjeta si existe. Esta verificación no convierte el recurso en obligatorio ni crea el archivo que falta. En el tercer caso, `list_resources("text")` enumera entradas a través del adaptador del contenedor; `path.name` toma el nombre de cada entrada y `sorted` ordena la salida para que resulte fácil compararla.
+
+### Por qué repetir la prueba después del build
+
+Cuando trabajas desde el código fuente, una ruta relativa puede parecer suficiente por casualidad: el proceso quizá se ejecuta desde la raíz del proyecto. Una aplicación empaquetada puede tener otra ubicación y otra estructura interna. La prueba frozen confirma que el mismo código de la vista sigue resolviendo los recursos a través del Engine. Si `greeting.txt` falta, conviene que el fallo sea visible: ocultarlo haría pasar por correcto un paquete incompleto.
+
+## 6. Temas Kivy y canvas
+
+
+
+Kivy no usa QSS ni `objectName`. `theme.py` aporta tokens y `ThemedCard` pinta
+la superficie usando el canvas Kivy.
 
 ~~~python
 with self.canvas.before:
     self._card_color = Color(*tokens("light")["surface"])
     self._card_background = RoundedRectangle(radius=[dp(12)])
-
-def apply_theme(self, theme_name):
-    palette = tokens(theme_name)
-    self._card_color.rgba = palette["surface"]
 ~~~
 
-El selector Light/Dark actualiza `Window.clearcolor`, la cabecera, tarjetas,
-inputs y botones. Es la adaptación Kivy del QSS y los object names de Qt.
+`ThemedCard` también sincroniza el rectángulo cuando cambia posición o tamaño.
+Al alternar tema no se recrea el canvas: se actualiza el `Color` existente y
+se propaga `apply_theme` a los hijos. La raíz actualiza `Window.clearcolor`,
+la cabecera y `TabbedPanelItem`. **Prueba ahora:** revisa que inputs, botones
+y tarjetas conservan contraste tanto en Light como en Dark.
 
-## 5. Pydux, payloads y DevTools
 
-El store habilita DevTools únicamente fuera de frozen:
+### Entender el dibujo en Kivy
+
+En Kivy, `canvas.before` agrupa instrucciones gráficas que se ejecutan antes del dibujo normal del widget. `Color` establece el color que usarán las instrucciones posteriores y `RoundedRectangle` define la forma de la superficie. `tokens("light")["surface"]` toma el color de la paleta; el operador `*` entrega sus componentes como argumentos separados a `Color`. `dp(12)` define el radio de las esquinas con una medida adaptada a la densidad.
+
+Crear el rectángulo una vez no basta: si el widget cambia de tamaño o se mueve, la geometría del fondo debe seguirlo. Por eso `ThemedCard` sincroniza posición y dimensiones. Al cambiar entre Light y Dark, modificar el color de la instrucción ya creada es diferente de construir un canvas nuevo para cada cambio.
+
+### Diferencia fundamental respecto a Qt
+
+No busques una hoja QSS ni `objectName` en este ejemplo. Los tokens son datos de estilo y `apply_theme` los distribuye hacia los widgets correspondientes. `Window.clearcolor` controla el fondo de la ventana, mientras que las tarjetas, botones y pestañas necesitan sus propias actualizaciones. Un cambio de fondo correcto no demuestra por sí solo que todos los controles hayan recibido el tema.
+
+## 7. Context, settings y Container
+
+
+
+Los widgets usan `self.app_settings`, `self.is_frozen` y `self.get_resource`;
+Container demuestra la API profunda en modo Headless.
 
 ~~~python
+isolated = EngineContainer(
+    framework_name="Headless", custom_root=Path(__file__).parents[1],
+    enable_sentry=False,
+)
+metadata = isolated.load_settings_use_case.execute()
+~~~
+
+Hello usa el contexto inyectado para mostrar plataforma; Context compara
+`metadata.identifier`, theme e `is_frozen`; Container crea un Engine aislado
+con adaptador Headless. El último es útil para scripts y pruebas, no sustituye
+el contexto ya inicializado de la ventana. En widgets comunes prefiere
+`self.app_settings`, `self.get_resource` y `self.is_frozen`.
+
+### Helpers de Component y helpers globales
+
+`store.py` usa `load_build_settings()` e `is_frozen()` para llevar datos del
+runtime al slice `runtime`.
+
+`RuntimeInfoCard` se suscribe a ese slice y despacha `refresh_runtime_info` al
+montarse. Así demuestra que un helper global puede alimentar estado reactivo
+sin pasar la ventana raíz por todos los componentes.
+
+
+### API cotidiana frente a API avanzada
+
+Para una vista normal, los accesos `self.app_settings`, `self.is_frozen` y `self.get_resource` son la vía más sencilla: no necesitas conocer cómo se ensamblan los adaptadores internos del Engine. Los settings son configuración del arranque; `is_frozen` describe el modo de distribución y `get_resource` localiza archivos. Ninguno de ellos es, por sí solo, un mecanismo para actualizar etiquetas de forma reactiva.
+
+`EngineContainer` representa un nivel de acceso más profundo. En el fragmento, `framework_name="Headless"` indica que el contenedor aislado no se utiliza para crear una segunda interfaz gráfica. `custom_root=Path(__file__).parents[1]` le proporciona una raíz explícita para el ejemplo y `enable_sentry=False` desactiva esa integración en el contenedor de demostración. `load_settings_use_case.execute()` ejecuta el caso de uso que carga los settings y devuelve la información consultada por la vista.
+
+### Por qué no crear un contenedor por widget
+
+La raíz ya dispone de un contexto inicializado. Crear contenedores adicionales dentro de cada tarjeta añadiría trabajo, duplicaría responsabilidades y dificultaría saber qué configuración está usando cada parte. El contenedor Headless de esta pestaña es una demostración deliberada de una API útil para scripts, integraciones y pruebas; no es el patrón recomendado para cada componente visual.
+
+El ejemplo de `RuntimeInfoCard` conecta dos ideas: los helpers globales pueden obtener datos del runtime y Pydux puede distribuirlos a la interfaz. El helper consulta información; el dispatch actualiza el estado compartido; el componente suscrito recibe el cambio. Son responsabilidades distintas que conviene no mezclar.
+
+## 8. Store, CounterCard y DevTools
+
+El store se configura una sola vez en `store.py`. Primero detecta el modo de
+ejecución y después registra los tres slices del demo. La misma condición
+desactiva tanto el historial de DevTools como el servidor inspector en un
+bundle frozen:
+
+~~~python
+from pydux import configure_store, create_selector, create_slice
+from qyro import is_frozen, load_build_settings
+
 RUNNING_FROZEN = is_frozen()
+
 store = configure_store(
     {
         "counter": counter_slice,
@@ -133,29 +308,46 @@ store = configure_store(
 )
 ~~~
 
-CounterCard hereda de BoxLayout, Component y Reactive. Reactive programa las
-actualizaciones en Clock, que es el loop de Kivy. En Pydux pulsa +1 o -1 y usa
-el botón **Abrir Pydux DevTools** para abrir el inspector local. En un bundle
-frozen se muestra una tarjeta explicando que el inspector se desactivó.
+No sustituyas esta condición por un flag visual de la interfaz: `is_frozen()`
+describe el runtime que realmente está ejecutando la aplicación. Por eso el
+demo no deja un inspector web activo en la versión distribuida.
 
-La pestaña Context también demuestra que los helpers pueden alimentar estado
-reactivo sin pasar el contexto por todos los componentes:
+
+
+`CounterCard` se suscribe con `Reactive`; los botones Kivy despachan acciones.
 
 ~~~python
-def refresh_runtime_info():
-    settings = load_build_settings()
-    return runtime_slice.actions.set_info({
-        "app_name": settings.get("app_name", "Qyro Application"),
-        "theme": settings.get("theme", "sin tema"),
-        "is_frozen": RUNNING_FROZEN,
-    })
+self.bind_selector(store, select_counter, self.update_count)
+self.increment.bind(on_release=lambda *_: store.dispatch(
+    counter_slice.actions.increment()))
 ~~~
 
-`RuntimeInfoCard` se suscribe a `select_runtime_info` y despacha esa acción al
-montarse. Así el origen de los datos sigue siendo Qyro, pero el render depende
-del store, igual que en PySide6.
+DevTools solo se inicia cuando `not RUNNING_FROZEN`.
 
-En Payloads, ProfileEditor despacha el objeto:
+El selector entrega a `CounterCard` solo el texto derivado, no todo el estado.
+`component_did_mount` consulta el estado actual para no esperar el primer
+dispatch. `PyduxView` crea `DevToolsButton` con `inspector.base_url`; frozen
+recibe una `InfoCard` explicativa. **Prueba ahora:** pulsa +1/−1, observa la
+acción en DevTools y confirma que el inspector no aparece en producción.
+
+
+### Qué hace una suscripción
+
+`bind_selector(store, select_counter, self.update_count)` establece una relación entre el store, un selector y un callback del componente. El selector extrae la información relevante; `update_count` actualiza la representación visible. Así, la tarjeta no tiene que consultar manualmente todo el estado después de cada clic. La consulta inicial realizada en `component_did_mount` también importa: permite mostrar el valor actual antes de que ocurra la siguiente acción.
+
+En Kivy, `bind(on_release=...)` conecta un evento del botón con una función. La lambda acepta los argumentos del evento mediante `*_` y llama a `store.dispatch(...)`. La acción `counter_slice.actions.increment()` describe la intención; el store procesa el cambio y los suscriptores observan el resultado. El botón no modifica directamente la etiqueta del contador, lo que evita tener dos fuentes de verdad.
+
+### Para qué sirve el inspector
+
+DevTools ayuda a inspeccionar acciones y cambios de estado durante el desarrollo. La condición `not RUNNING_FROZEN` distingue la experiencia de depuración de la aplicación distribuida. La vista muestra un botón que usa `inspector.base_url` cuando el inspector está disponible; en frozen ofrece una tarjeta explicativa en lugar de fingir que el servicio sigue activo.
+
+**Qué observar:** presiona +1 varias veces y después −1. Comprueba que el número cambia por la suscripción, no por una asignación manual dentro del botón, y que las acciones pueden inspeccionarse en modo de desarrollo.
+
+## 9. Payloads entre dos componentes
+
+
+
+`ProfileEditor` despacha el payload y `ProfilePreview` observa `select_profile`.
 
 ~~~python
 store.dispatch(profile_slice.actions.set_profile({
@@ -164,23 +356,135 @@ store.dispatch(profile_slice.actions.set_profile({
 }))
 ~~~
 
-ProfilePreview escucha select_profile y actualiza sus labels sin una referencia
-directa al emisor. Observa profile/set_profile en DevTools.
+El contrato entre ambos widgets es únicamente el objeto `{name, role}`.
+`ProfileEditor` no tiene referencia al preview; `ProfilePreview` solo observa
+`select_profile`. `PayloadsView.cleanup` llama
+`component_will_unmount()` del preview. **Prueba ahora:** envía nombre y rol;
+la tarjeta receptora cambia y DevTools muestra `profile/set_profile`.
 
-## 6. Pruebas y build
 
-La prueba headless verifica settings y recursos:
+### El flujo completo de un mensaje
 
-~~~bash
-conda activate osx310
-cd qyro/examples/kivy-cli-runtime
-pytest
+`ProfileEditor` recoge el texto de dos inputs. `.strip()` elimina espacios sobrantes al principio y al final; `or "Sin nombre"` y `or "Sin rol"` establecen valores de respaldo cuando el campo queda vacío. Después se crea un diccionario con las claves `name` y `role` y se envía mediante `store.dispatch(profile_slice.actions.set_profile(...))`.
+
+El editor no busca el widget de vista previa ni llama a un método suyo. `ProfilePreview` observa `select_profile` y actualiza su contenido cuando cambia el valor seleccionado. Esta separación es útil cuando el emisor y el receptor se encuentran en lugares distintos del árbol de widgets: solo necesitan compartir el contrato del estado.
+
+### Por qué importa la limpieza
+
+Una suscripción puede seguir recibiendo eventos aunque la pantalla que la creó ya no se utilice, si no se libera correctamente. Por eso `PayloadsView.cleanup` llama al ciclo de desmontaje del preview. El ejemplo enseña tanto cómo conectar componentes como cómo evitar que sus observadores queden vivos innecesariamente.
+
+## 10. Limpieza de suscripciones e inspector
+
+
+
+El cierre real del demo limpia cada vista reactiva y detiene el inspector.
+
+~~~python
+for view in getattr(self, "views", []):
+    cleanup = getattr(view, "cleanup", None)
+    if callable(cleanup): cleanup()
+if getattr(store, "inspector", None): store.inspector.stop()
 ~~~
 
-La interfaz debe probarse desde una sesión gráfica con un proveedor de ventana
-Kivy disponible; un entorno CI sin display puede comprobar imports, settings y
-recursos, pero no garantiza OpenGL ni un Window real.
+El código real une el cierre nativo a `_request_close`, que llama `self.stop`,
+y `on_stop`, que invoca `_shutdown`. El guard `_shutdown_complete` evita
+limpiar dos veces si Kivy y el sistema notifican el mismo cierre. Context y
+Pydux tienen `cleanup` porque poseen los componentes `Reactive` del demo.
 
-Después de source, ejecuta qyro build. El código de recursos y settings no
-cambia entre source y frozen. Mantén secretos en settings/secrets.json local y
-no los muestres en widgets.
+
+### Qué sucede al cerrar la ventana
+
+El cierre comienza con un evento nativo de Kivy, enlazado a `_request_close`. Esa ruta llama a `self.stop`; el callback `on_stop` termina conduciendo a `_shutdown`. La limpieza recorre `self.views` y comprueba si cada vista tiene un método `cleanup` invocable. Esa comprobación permite que algunas páginas tengan recursos que liberar y otras no, sin imponer una implementación vacía a todas.
+
+El inspector es otro recurso con ciclo de vida propio: si existe, se detiene. El indicador `_shutdown_complete` evita repetir operaciones cuando el sistema o Kivy generan más de una notificación relacionada con el cierre. Esta protección es especialmente útil para recursos que no admiten una segunda liberación.
+
+**Qué observar:** después de probar el contador y el perfil, cierra la ventana normalmente. No debería quedar un inspector de desarrollo ejecutándose por culpa del demo. Esta sección explica el contrato de limpieza; no debe confundirse con la eliminación visual de un widget del layout.
+
+## 11. Secretos, telemetría y ejecución frozen
+
+
+
+Mantén secretos en `settings/secrets.json` local. Configura protección de
+recursos y telemetría fuera de `render`; después de `qyro build`, Resources y
+Context deben conservar su API porque usan helpers Qyro.
+
+### Secretos y recursos protegidos
+
+No versiones secretos ni fabriques archivos `.qyro`; la CLI crea el bundle
+protegido durante el build.
+
+### Telemetría
+
+`ApplicationContext` inicializa la telemetría al arrancar. Usa un DSN local de
+prueba si instalas el addon Sentry.
+
+No llames `sentry_sdk.init` desde `render`: el contexto es el único punto de
+arranque. La prueba headless valida settings y recursos, pero no OpenGL,
+proveedor de ventana, canvas ni interacción. Para validar esos aspectos debes
+ejecutar el demo en una sesión gráfica y repetir Resources/Context tras build.
+
+
+### Separar configuración, distribución y UI
+
+Los secretos son datos sensibles de configuración, no texto que deba aparecer en el código de una vista ni en el repositorio. El archivo local `settings/secrets.json` debe tratarse conforme al mecanismo de protección configurado para el proyecto. La creación de recursos protegidos corresponde al proceso de empaquetado de la CLI; no necesitas construir manualmente la carpeta `.qyro` para que una tarjeta pueda leer un recurso.
+
+La telemetría también pertenece al arranque. Inicializar el SDK directamente dentro de `render` mezclaría un efecto global con la construcción de widgets y podría provocar inicializaciones repetidas. El contexto centraliza esa responsabilidad cuando la integración está configurada; el ejemplo Headless desactiva Sentry expresamente para su contenedor aislado.
+
+### Qué cubren las pruebas y qué no
+
+Una prueba sin interfaz puede verificar settings y resolución de recursos, pero no demuestra que exista un proveedor gráfico operativo, que OpenGL funcione ni que las instrucciones del canvas produzcan el resultado esperado. Para validar Kivy necesitas ejecutar la aplicación en un entorno gráfico y comprobar los controles. El build frozen añade otra dimensión: comprueba que los archivos requeridos están disponibles fuera del árbol fuente.
+
+## 12. Verificación guiada
+
+### Recorrido completo esperado
+
+**Raíz y páginas.** `main.py` conserva las vistas en `self.views`, lo que le
+permite aplicar tema y limpieza sin que las páginas conozcan la ventana. Al
+cambiar una pestaña, `TabbedPanel.current_tab` invoca `apply_tab_theme`; al
+cambiar el tema, la raíz actualiza `Window.clearcolor`, cabecera, pestañas y
+cada vista. Comprueba ambos cambios antes de pasar a Pydux.
+
+**Componentes.** `DemoView` añade título y detalle una sola vez. `InfoCard`
+lee `title` y `message` desde `self.props` durante el montaje y construye sus
+labels Kivy. Props describen construcción: el contador y perfil demuestran por
+qué los cambios posteriores deben ir por el store y no mutando props.
+
+**Recursos.** Resources carga `text/greeting.txt` como obligatorio, consulta
+`themes/seasonal.kv` con `required=False` y lista el directorio mediante el
+adaptador. Eso prueba los tres contratos: recurso requerido, opcional y
+enumeración compatible con source/frozen.
+
+**Tema.** Kivy no tiene QSS. `ThemedCard` crea `Color` y `RoundedRectangle` en
+`canvas.before`, sincroniza posición/tamaño y cambia su `rgba` con tokens. La
+propagación de `apply_theme` a los hijos evita recrear tarjetas o dispersar
+colores en las vistas.
+
+**Estado y cierre.** `CounterCard` usa `bind_selector`; el selector reduce el
+estado a una etiqueta y los botones solo despachan acciones. Payloads separa
+emisor/receptor mediante `profile_slice`. Al cerrar, `_request_close` llama
+`stop`, `on_stop` llama `_shutdown`, cada vista ejecuta su `cleanup` y el
+inspector se detiene una sola vez mediante `_shutdown_complete`.
+
+**Frozen.** La prueba `pytest` valida el contrato sin ventana. Después de
+`qyro build`, prueba visualmente Kivy: la prueba headless no verifica OpenGL,
+el proveedor de ventana, el canvas ni las pestañas. Resources y Context deben
+seguir funcionando porque no dependen de `cwd` ni de rutas físicas.
+
+1. Ejecuta el contrato headless.
+2. Recorre las siete pestañas en una sesión gráfica.
+3. Cambia tema, contador y payload; abre DevTools en source.
+4. Construye y repite Resources/Context.
+
+~~~bash
+cd qyro/examples/kivy-cli-runtime
+pytest
+qyro build
+~~~
+
+### Cómo interpretar los resultados
+
+Realiza el recorrido en orden porque cada prueba aísla una responsabilidad. Si falla la apertura inicial, investiga la ejecución y el entorno Kivy antes de revisar Pydux. Si abre la ventana pero una tarjeta no cambia de color, revisa la propagación de `apply_theme` y las instrucciones de canvas. Si el contador no se actualiza, distingue entre el evento `on_release`, el dispatch y la suscripción del selector. Si el perfil no cambia, comprueba que el payload se envía y que la vista previa sigue suscrita.
+
+La prueba `pytest` verifica el contrato que el proyecto haya automatizado; no equivale a una prueba visual completa. `qyro build` construye el artefacto, pero la verificación final requiere **ejecutar el resultado empaquetado** y repetir, como mínimo, las comprobaciones de Resources y Context. Así podrás diferenciar un problema de rutas frozen de un problema de interfaz gráfica.
+
+**Criterio de finalización:** considera comprendido el demo cuando puedas explicar quién crea la ventana, de dónde salen los settings, cómo se compone una tarjeta, cómo se localiza un recurso, cómo cambia un tema, qué actualiza el store y qué se libera al cerrar. Esa comprensión importa más que memorizar nombres de clases.

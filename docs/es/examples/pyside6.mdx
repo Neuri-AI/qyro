@@ -1,5 +1,5 @@
 ---
-title: "Demo PySide6 paso a paso"
+title: "Demo familia Qt"
 description: "Recorrido del código ejecutable del demo PySide6 de Qyro Engine."
 ---
 
@@ -9,6 +9,13 @@ Los bloques de Python siguientes corresponden al código ejecutable del demo.
 No leas esta página como un catálogo de archivos: síguela en orden, ejecuta
 cada interacción y relaciona el resultado visible con el servicio de Qyro que
 la hace posible.
+
+<Note>
+Este es el demo de referencia para la familia Qt. La misma arquitectura y el
+recorrido funcionan con **PyQt6**, **PyQt5** y **PySide2**: cambia el binding en
+`settings/base.json` y los imports de Qt correspondientes. Ajusta únicamente
+las diferencias de importación o API propias de la versión de Qt que uses.
+</Note>
 
 ## Qué aprende cada pestaña
 
@@ -87,7 +94,7 @@ pyside6-cli-runtime/
 
 ## 2. Ventana raíz y composición de vistas
 
-### Concepto y objetivo
+
 
 ApplicationContext es la frontera entre la aplicación y el Engine. Al crear la
 ventana raíz, Qyro lee settings, selecciona el adaptador PySide6, crea o
@@ -181,7 +188,7 @@ self.apply_theme()
 
 ## 3. Widget base de las páginas
 
-### Concepto y objetivo
+
 
 Component no reconcilia árboles de widgets como un framework web. Organiza un
 lifecycle síncrono:
@@ -258,7 +265,7 @@ class ComponentsView(Root):
 
 ## 4. Componentes y props
 
-### Concepto y objetivo
+
 
 Una prop es información disponible al construir un hijo, por ejemplo un nombre
 o título. Hace al componente reutilizable, pero no es un canal reactivo:
@@ -300,7 +307,7 @@ montar el widget, conéctalo a Pydux en lugar de reasignar props.
 
 ## 5. Recursos y vista Resources
 
-### Concepto y objetivo
+
 
 En source, un archivo vive en el proyecto; en frozen puede vivir dentro del
 bundle o de un paquete protegido. get_resource abstrae esa diferencia: pide un
@@ -352,7 +359,7 @@ de recursos de Qyro tanto en source como en frozen.
 
 ## 6. Temas QSS y objectName
 
-### Concepto y objetivo
+
 
 Qt usa objectName como selector QSS. Al nombrar los widgets por su rol visual,
 por ejemplo card, primaryButton o field, un archivo de tema cambia toda la
@@ -417,7 +424,7 @@ primarios en #EA580C.
 
 ## 7. Context, settings y Container
 
-### Concepto y objetivo
+
 
 Settings describe el arranque y distribución: identidad, binding, icono y
 opciones propias. No es el estado mutable de la interfaz. ApplicationContext
@@ -510,7 +517,7 @@ mostrar el nombre de aplicación, el tema y si estás en source o frozen.
 
 ## 8. Store, CounterCard y DevTools
 
-### Concepto y objetivo
+
 
 CounterCard no recibe el contador por prop porque ese valor cambia mientras la
 aplicación está abierta. El botón despacha una acción; el reducer calcula el
@@ -619,7 +626,7 @@ control de time travel para volver temporalmente a una transición anterior.
 
 ## 9. Payloads entre dos componentes
 
-### Concepto y objetivo
+
 
 El store es el contrato entre emisor y receptor. ProfileEditor conoce el
 formato del payload, pero no ProfilePreview; este conoce el selector, pero no
@@ -681,7 +688,7 @@ receptora. En DevTools aparecerá profile/set_profile con el objeto enviado.
 
 ## 10. Limpieza de suscripciones e inspector
 
-### Concepto y objetivo
+
 
 Component no ejecuta component_will_unmount automáticamente cuando Qt destruye
 una ventana. Las vistas reactivas exponen cleanup y la raíz lo llama desde
@@ -705,7 +712,7 @@ def closeEvent(self, event):
 
 ## 11. Secretos, telemetría y ejecución frozen
 
-### Concepto y objetivo
+
 
 Estas capacidades de Qyro se prueban mediante configuración y build, no
 mostrando credenciales en un QLabel. Mantenerlas fuera de la UI evita exponer

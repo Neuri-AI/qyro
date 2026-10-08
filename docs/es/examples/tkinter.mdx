@@ -1,110 +1,297 @@
 ---
 title: "Demo Tkinter"
-description: "Aplicación Tkinter generada con Qyro CLI que prueba contexto, recursos, componentes y Pydux."
+description: "Recorrido del código ejecutable del demo Tkinter de Qyro Engine."
 ---
 
-El proyecto [examples/tkinter-cli-runtime](https://github.com/Neuri-AI/qyro-engine/tree/main/examples/tkinter-cli-runtime)
-adapta el recorrido de PySide6 y Kivy a widgets nativos de Tkinter. Se creó con
-la CLI de Qyro.
+Esta guía documenta el código real de
+[examples/tkinter-cli-runtime](https://github.com/Neuri-AI/qyro-engine/tree/main/examples/tkinter-cli-runtime).
+Sigue el recorrido en orden: cada pestaña prueba una capacidad concreta de
+Qyro o Pydux mediante widgets Tkinter.
 
-## Crear y ejecutar
+## Qué aprende cada pestaña
+
+Qyro no sustituye a Tkinter. Tkinter continúa creando widgets, manejando el
+loop y atendiendo eventos; Qyro resuelve configuración, recursos, ciclo de
+vida y runtime multiplataforma.
+
+| Capacidad | Dónde se prueba | Por qué usarla |
+| --- | --- | --- |
+| ApplicationContext | Ventana raíz, Hello y Context | Prepara settings, metadata, recursos y runtime una sola vez. |
+| Component y lifecycle | Vistas y tarjetas | Ordena preparación, render y montaje de widgets. |
+| Props | Components, Pydux y Payloads | Entrega valores de construcción a componentes reutilizables. |
+| Settings y recursos | Context y Resources | Evita rutas hardcodeadas que fallen en frozen. |
+| Tema con tokens Tkinter | Cabecera, tabs, tarjetas e inputs | Cambia la identidad visual con una sola paleta. |
+| EngineContainer | Container | Expone adapters y use cases para scripts o pruebas. |
+| Pydux y DevTools | Pydux | Ofrece estado observable y depurable. |
+| Payloads | Payloads | Comunica componentes sin referencias directas. |
+| Secretos, telemetría y bundle | Paso 11 | Configura capacidades de producción fuera de la UI. |
+
+## Ruta de aprendizaje
+
+1. Ejecuta el proyecto y abre Hello para ver el runtime inicializado.
+2. Visita Components para separar props de estado mutable.
+3. Visita Resources y alterna el tema.
+4. Usa Context y Container para comparar helpers y API profunda.
+5. Prueba el contador y DevTools antes de enviar payloads.
+6. Termina con limpieza, secretos, telemetría y build frozen.
+
+## 1. Crear y ejecutar el proyecto
+
+La base se creó con la CLI de Qyro dentro de `osx310`:
 
 ~~~bash
 conda activate osx310
 qyro init --name tkinter-cli-runtime --target-platform desktop \
   --binding Tkinter --app-name qyro-tkinter-demos --version 0.1.0 \
   --author "Qyro Team" --addon pydux --yes
+~~~
+
+Para abrir el demo:
+
+~~~bash
+conda activate osx310
 cd qyro/examples/tkinter-cli-runtime
 qyro start
 ~~~
 
-La fase de Poetry puede requerir permisos para su caché. El demo se valida con
-las dependencias ya disponibles en `osx310`.
+La instalación automática de Poetry de la CLI puede requerir permisos para su
+caché. El demo se validó con Qyro Engine, Tkinter y Pydux instalados en
+`osx310`.
 
-## Recorrido
+La estructura final es:
 
-| Pestaña | Capacidad |
-| --- | --- |
-| Hello | `ApplicationContext`, metadata y helpers. |
-| Components | Props en widgets reutilizables. |
-| Resources | `get_resource`, recurso opcional y `list_resources`. |
-| Context | Settings, `is_frozen`, contexto y helpers → Pydux. |
-| Container | `EngineContainer` Headless aislado. |
-| Pydux | Selector, acciones, `Reactive` y DevTools. |
-| Payloads | Datos entre componentes sin referencias directas. |
+~~~text
+tkinter-cli-runtime/
+├── main.py
+├── store.py
+├── theme.py
+├── components/cards.py
+├── views/pages.py
+├── resources/base/text/greeting.txt
+├── settings/base.json
+└── tests/test_project.py
+~~~
 
-La raíz usa el loop nativo de Tkinter:
+## 2. Ventana raíz y composición de vistas
+
+`ApplicationContext` es la frontera entre la app y el Engine: lee settings,
+prepara metadata y recursos, y conserva el runtime compartido. Solo la raíz
+hereda de `ApplicationContext`; las vistas no deben crear otro Engine.
+
+**Prueba ahora:** abre Hello. Nombre, versión, plataforma y frozen llegan sin
+abrir JSON ni usar `sys.platform` desde la vista.
+
+La raíz combina `tk.Tk`, `Component` y `ApplicationContext`. Toma dimensiones
+y tema desde settings, registra un cierre ordenado y activa la ventana creada
+por `qyro start` en macOS:
 
 ~~~python
 class QyroTkinterDemos(tk.Tk, Component, ApplicationContext):
     def component_will_mount(self):
-        self.geometry("980x680")
+        window = self.app_settings.get("window", {})
+        self.geometry(f"{window.get('width', 980)}x{window.get('height', 680)}")
+        self.minsize(760, 520)
+        self.title(self.app_settings.get("app_name", "Qyro Tkinter Demos"))
         self.current_theme = self.app_settings.get("theme", "light")
         self.protocol("WM_DELETE_WINDOW", self.close_application)
-
-if __name__ == "__main__":
-    QyroTkinterDemos().mainloop()
+        self.after_idle(self._activate_window)
 ~~~
 
-## Vistas, props y tema
-
-`main.py` crea una barra de botones Tkinter y un contenedor de vistas; así no
-depende del estilo Aqua de `ttk.Notebook`. Las páginas viven en `views/pages.py`
-y los widgets reutilizables en `components/cards.py`.
+La interfaz usa una cabecera, controles clicables y un stack de vistas. Las
+tabs son `ThemeLabel`, no controles nativos, para que el color provenga de los
+tokens del demo de forma consistente:
 
 ~~~python
-view = view_type(self.tab_content, context=self, title=title, detail=detail)
-self.views.append(view)
-self.tab_buttons.append(button)
-self.views.append(view)
+class ThemeLabel(tk.Label):
+    def __init__(self, parent, command, **kwargs):
+        super().__init__(parent, cursor="hand2", **kwargs)
+        self.bind("<Button-1>", lambda _event: command())
 ~~~
 
-Los keywords no nativos pasan a `props`:
+Las especificaciones de pestaña se declaran como datos. `context`, `title` y
+`detail` son props de Qyro; el primer argumento es el parent nativo de Tkinter.
+Cada vista se coloca en el mismo contenedor y la seleccionada usa `tkraise()`;
+por ello cambiar de vista es inmediato y volver no reconstruye su contenido.
 
 ~~~python
-InfoCard(self, title="Props directas",
-         message="name='Ada Lovelace' · role='Arquitecta de software'")
+self.views = []
+self.tab_buttons = []
+for index, (tab_text, view_type, title, detail) in enumerate(specs):
+    button = ThemeLabel(
+        self.tab_bar, lambda i=index: self.select_tab(i),
+        text=tab_text, padx=16, pady=10,
+    )
+    button.pack(side="left", fill="x", expand=True, padx=2)
+    self.tab_buttons.append(button)
+
+    view = view_type(self.tab_content, context=self, title=title, detail=detail)
+    view.place(relx=0, rely=0, relwidth=1, relheight=1)
+    self.views.append(view)
+
+def select_tab(self, index):
+    self.selected_tab = index
+    self.views[index].tkraise()
+    self.apply_theme()
 ~~~
 
-Las props describen construcción; no son estado reactivo. Para cambios usa el
-store. Tkinter no usa QSS: `theme.py` concentra tokens y `apply_theme` configura
-`bg`, `fg`, inputs y botones. La pestaña activa usa naranja `#EA580C` y el
-selector Light/Dark actualiza todas las vistas.
+## 3. Vista base y lifecycle
 
-## Recursos, contexto y container
+`Component` no reconcilia árboles como un framework web. Su ciclo es síncrono:
 
-Las vistas reciben `context` explícitamente y también usan helpers para reducir
-prop drilling:
+~~~text
+constructor nativo -> component_will_mount -> render -> component_did_mount
+~~~
+
+`DemoView` concentra la estructura común de todas las páginas: obtiene props,
+crea título y detalle en `render`, y ofrece `add_card` para componer tarjetas.
+
+~~~python
+class DemoView(tk.Frame, Component):
+    def component_will_mount(self):
+        self.app_context = self.props.get("context")
+        self.title, self.detail = self.props["title"], self.props["detail"]
+        self.configure(padx=18, pady=16)
+
+    def render(self):
+        self.title_label = tk.Label(
+            self, text=self.title, anchor="w",
+            font=("TkDefaultFont", 22, "bold"),
+        )
+        self.detail_label = tk.Label(self, text=self.detail, anchor="w", justify="left")
+        self.title_label.pack(fill="x")
+        self.detail_label.pack(fill="x", pady=(5, 14))
+
+    def add_card(self, card):
+        card.pack(fill="x", pady=(0, 12))
+        return card
+~~~
+
+**Prueba ahora:** cambia de pestaña y vuelve. La vista permanece creada y
+mantiene su contenido porque todas viven en el mismo stack.
+
+## 4. Componentes y props
+
+Una prop es información disponible durante la construcción de un hijo, como un
+título o mensaje. Hace reutilizable al componente, pero no es un canal
+reactivo: para datos que cambian durante la ejecución usa Pydux.
+
+**Prueba ahora:** abre Components. Las dos tarjetas se construyen con props
+directas; el segundo mensaje ilustra cómo una API puede documentar valores
+equivalentes de un diccionario.
+
+`InfoCard` resuelve sus props durante montaje y construye sus labels después:
+
+~~~python
+class InfoCard(ThemedCard, Component):
+    def component_will_mount(self):
+        self.title = self.props.get("title", "Información")
+        self.message = self.props.get("message", "")
+        self.configure(padx=18, pady=14, bd=0, highlightthickness=1)
+
+    def render(self):
+        self.title_label = tk.Label(
+            self, text=self.title, anchor="w",
+            font=("TkDefaultFont", 15, "bold"),
+        )
+        self.message_label = tk.Label(
+            self, text=self.message, anchor="w", justify="left", wraplength=760,
+        )
+        self.title_label.pack(fill="x")
+        self.message_label.pack(fill="x", pady=(8, 0))
+~~~
+
+La página Components compone dos instancias de `InfoCard`:
+
+~~~python
+self.add_card(InfoCard(
+    self, title="Props directas",
+    message="name='Ada Lovelace' · role='Arquitecta de software'",
+))
+self.add_card(InfoCard(
+    self, title="Props por diccionario",
+    message="props={'name': 'Linus Torvalds'} · role='Mantenedor'",
+))
+~~~
+
+## 5. Recursos y tema
+
+En source, un recurso vive en el proyecto; en frozen puede vivir en un bundle.
+`get_resource` recibe un nombre lógico y abstrae esa diferencia. No construyas
+rutas desde el directorio actual o desde `__file__` para recursos de runtime.
+
+**Prueba ahora:** abre Resources. Debe cargar `greeting.txt`, informar que el
+recurso opcional no existe y listar el directorio lógico `text`.
 
 ~~~python
 greeting = Path(self.get_resource("text/greeting.txt")).read_text(encoding="utf-8")
-listed = sorted(path.name for path in self.app_context.container.resource_adapter.list_resources("text"))
-settings = self.app_settings
-frozen = self.is_frozen
-~~~
-
-`ContainerView` crea un `EngineContainer` con `framework_name="Headless"` para
-inspeccionar adapters y metadata sin depender de la ventana.
-
-## Pydux, DevTools y payloads
-
-El inspector solo se inicia fuera de frozen:
-
-~~~python
-RUNNING_FROZEN = is_frozen()
-store = configure_store(
-    {"counter": counter_slice, "profile": profile_slice, "runtime": runtime_slice},
-    devtools=not RUNNING_FROZEN,
-    inspector_auto_start=not RUNNING_FROZEN,
+optional = Path(self.get_resource("themes/seasonal.tcl", required=False))
+listed = sorted(
+    path.name
+    for path in self.app_context.container.resource_adapter.list_resources("text")
 )
 ~~~
 
-`CounterCard` hereda de `tk.Frame`, `Component` y `Reactive`; Reactive usa
-`widget.after`, el loop correcto de Tkinter. La pestaña Pydux abre DevTools y
-el cierre pasa por `close_application`, que desuscribe componentes y detiene el
-inspector.
+El tema usa `theme.py` como fuente única de tokens y cada tarjeta aplica
+directamente sus colores Tkinter. El control de cabecera actualiza superficie,
+texto, inputs, tarjetas y tabs juntos:
 
-`RuntimeInfoCard` lleva datos de helpers Qyro al store:
+~~~python
+THEMES = {
+    "light": {
+        "window": "#F6F7FB", "surface": "#FFFFFF",
+        "surface_alt": "#EAF0F9", "text": "#191E2D",
+        "muted": "#53627F", "accent": "#EA580C",
+        "accent_text": "#FFFFFF", "input": "#FFFFFF",
+    },
+    "dark": {
+        "window": "#0D111B", "surface": "#18202F",
+        "surface_alt": "#263044", "text": "#F1F5F9",
+        "muted": "#B2BDD0", "accent": "#EA580C",
+        "accent_text": "#FFFFFF", "input": "#202A3A",
+    },
+}
+~~~
+
+~~~python
+def toggle_theme(self):
+    self.current_theme = "dark" if self.current_theme == "light" else "light"
+    self.apply_theme()
+~~~
+
+## 6. Context, settings y Container
+
+Settings describen el arranque y distribución; no son el estado mutable de la
+UI. Las vistas conservan `context` explícito para metadata y adapters, y usan
+helpers de Component cuando basta con settings, recursos o frozen.
+
+**Prueba ahora:** Context muestra identificación, tema y frozen. Después abre
+Container para ver un `EngineContainer` Headless sin crear otra ventana.
+
+Hello demuestra helpers heredados:
+
+~~~python
+class HelloView(DemoView):
+    def component_did_mount(self):
+        settings = self.app_settings
+        self.add_card(InfoCard(self, title="ApplicationContext + helpers", message=(
+            f"App: {settings.get('app_name')} v{settings.get('version')}\n"
+            f"Platform: {self.app_context.platform.value} | frozen: {self.is_frozen}"
+        )))
+~~~
+
+Container crea su contexto aislado para casos avanzados:
+
+~~~python
+isolated = EngineContainer(
+    framework_name="Headless",
+    custom_root=Path(__file__).parents[1],
+    enable_sentry=False,
+)
+metadata = isolated.load_settings_use_case.execute()
+~~~
+
+Los helpers procedurales equivalentes sirven fuera de un Component, por ejemplo
+en `store.py`:
 
 ~~~python
 def refresh_runtime_info():
@@ -116,17 +303,151 @@ def refresh_runtime_info():
     })
 ~~~
 
-En Payloads, `ProfileEditor` despacha un objeto y `ProfilePreview` escucha
-`select_profile`; ambos quedan desacoplados.
+`RuntimeInfoCard` se suscribe a `runtime`, despacha esa acción al montarse y
+renderiza el resultado en Context. Así helpers de Qyro y estado reactivo se
+combinan sin acoplar la tarjeta a la ventana raíz.
 
-## Pruebas y build
+## 7. Store, CounterCard y DevTools
+
+El contador no se pasa por prop porque cambia mientras la aplicación está
+abierta. La acción cambia el store y el selector entrega al componente solo la
+cadena que necesita.
+
+**Prueba ahora:** en Pydux pulsa +1 y −1. La etiqueta cambia por `Reactive`, no
+porque el padre modifique la tarjeta.
+
+~~~python
+counter_slice = create_slice(
+    "counter", {"value": 0},
+    {
+        "increment": lambda state, action: state.update(value=state["value"] + 1),
+        "decrement": lambda state, action: state.update(value=state["value"] - 1),
+    },
+)
+store = configure_store(
+    {"counter": counter_slice, "profile": profile_slice, "runtime": runtime_slice},
+    devtools=not RUNNING_FROZEN,
+    inspector_auto_start=not RUNNING_FROZEN,
+)
+select_counter = create_selector(
+    lambda state: state["counter"]["value"],
+    lambda value: f"Contador compartido: {value}",
+)
+~~~
+
+`CounterCard` posee tanto la suscripción como los botones que despachan:
+
+~~~python
+class CounterCard(ThemedCard, Component, Reactive):
+    def component_will_mount(self):
+        self.title = self.props.get("title", "Contador")
+        self.bind_selector(store, select_counter, self.update_count)
+
+    def update_count(self, text):
+        if hasattr(self, "value_label"):
+            self.value_label.configure(text=text)
+
+    def component_did_mount(self):
+        self.update_count(select_counter(store.get_state()))
+~~~
+
+Reactive detecta el widget Tkinter y programa la entrega inicial con
+`widget.after`, es decir, el loop correcto de Tkinter. El botón de la pestaña
+abre la URL real de DevTools; normalmente `http://127.0.0.1:8765`, aunque Pydux
+elige otro puerto si está ocupado. En frozen, el inspector no inicia.
+
+## 8. Payloads entre componentes
+
+El store es el contrato entre emisor y receptor. `ProfileEditor` no conoce
+`ProfilePreview`; uno solo despacha el payload y el otro se suscribe al
+selector.
+
+**Prueba ahora:** escribe nombre y rol, pulsa Enviar payload y revisa la
+tarjeta receptora y `profile/set_profile` en DevTools.
+
+~~~python
+def send_profile(self):
+    store.dispatch(profile_slice.actions.set_profile({
+        "name": self.name_input.get().strip() or "Sin nombre",
+        "role": self.role_input.get().strip() or "Sin rol",
+    }))
+~~~
+
+~~~python
+class ProfilePreview(InfoCard, Reactive):
+    def component_will_mount(self):
+        super().component_will_mount()
+        self.title = self.props.get("title", "Componente receptor")
+        self.bind_selector(store, select_profile, self.update_profile)
+
+    def update_profile(self, profile):
+        if hasattr(self, "message_label"):
+            self.message_label.configure(
+                text=f"Nombre: {profile['name']}\nRol: {profile['role']}"
+            )
+~~~
+
+## 9. Limpieza de suscripciones e inspector
+
+Al cerrar Tkinter, la raíz llama explícitamente la limpieza de vistas reactivas
+y detiene el inspector. Esto evita suscripciones que intenten actualizar un
+widget destruido.
+
+~~~python
+def close_application(self):
+    self._shutdown()
+    self.destroy()
+
+def _shutdown(self):
+    if self._shutdown_complete:
+        return
+    self._shutdown_complete = True
+    for view in getattr(self, "views", []):
+        cleanup = getattr(view, "cleanup", None)
+        if callable(cleanup):
+            cleanup()
+    inspector = getattr(store, "inspector", None)
+    if inspector:
+        inspector.stop()
+~~~
+
+## 10. Secretos, telemetría y frozen
+
+Estas capacidades se prueban con configuración y build, no mostrando
+credenciales en widgets. Mantén secretos locales fuera del control de versiones
+y lee únicamente el valor que necesites desde settings.
+
+Para probar recursos protegidos y runtime frozen:
+
+~~~bash
+qyro build
+~~~
+
+Después abre el artefacto y repite Resources y Context. Deben funcionar porque
+usan `get_resource` y `app_settings`, no rutas físicas. Para telemetría,
+inicializa el addon desde configuración; no lo inicialices desde `render`.
+
+## 11. Verificación guiada
+
+La prueba headless valida settings y recursos sin abrir la interfaz:
 
 ~~~bash
 conda activate osx310
 cd qyro/examples/tkinter-cli-runtime
 pytest
-qyro build
 ~~~
 
-La prueba headless verifica settings y recursos. Prueba la ventana en una
-sesión gráfica para comprobar estilos nativos y DevTools.
+Para revisar visualmente el demo:
+
+1. Ejecuta `qyro start` y confirma metadata y plataforma en Hello.
+2. Abre Components y compara props directas con props por diccionario.
+3. En Resources confirma greeting, opcional y listado lógico.
+4. Alterna Light/Dark: cabecera, tabs, tarjetas, inputs y botones cambian juntos.
+5. En Context revisa runtime; en Container revisa los adapters Headless.
+6. En Pydux usa +1 y −1 y abre DevTools para inspeccionar el historial.
+7. En Payloads envía nombre y rol y comprueba el receptor.
+8. Cierra la ventana y confirma que DevTools se detiene sin errores.
+
+Consulta también [Componentes](/es/components), [Recursos](/es/resources),
+[ApplicationContext](/es/application-context), [Pydux](/es/pydux) y
+[Recursos protegidos](/es/protected-resources).

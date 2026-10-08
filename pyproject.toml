@@ -32,6 +32,11 @@ pytest = ">=8.0.0"
 pytest-cov = ">=4.1.0"
 cython = ">=3.0.12,<4.0.0"
 
+[tool.pytest.ini_options]
+# Example projects deliberately use the same test module names.  Import tests
+# by path so pytest does not treat them as one top-level ``test_project`` module.
+addopts = "--import-mode=importlib"
+
 [build-system]
 requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
