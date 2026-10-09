@@ -145,7 +145,7 @@ No lo versiones. La aplicación obtiene sus valores desde `context.app_settings`
 
 ## Secretos cifrados en frozen
 
-Durante build, Qyro CLI cifra el objeto completo de `secrets.json`; no distribuye su copia source en claro. El runtime prefiere `.qyro/secrets.enc` embebido dentro de `protected_resources.pak`. Como compatibilidad, también acepta el archivo cifrado externo `.qyro/secrets.json`. En ambos casos necesita un módulo compilado `runtime*.so`, `.pyd` o `.dylib` con `RUNTIME_SECRET_HEX`.
+Durante build, Qyro CLI cifra el objeto completo de `secrets.json`; no distribuye su copia source en claro. El runtime prefiere `.qyro/secrets.enc` embebido dentro de `resources.pak`. Como compatibilidad, también acepta el archivo cifrado externo `.qyro/secrets.json`. En ambos casos necesita un módulo compilado `runtime*.so`, `.pyd` o `.dylib` con `RUNTIME_SECRET_HEX`.
 
 El payload descifrado debe ser UTF-8, JSON y un objeto. A diferencia de los JSON ordinarios, un secreto cifrado inválido genera `ValueError`/`SecretsCryptoError`, porque continuar silenciosamente podría arrancar con credenciales incorrectas.
 

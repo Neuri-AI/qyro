@@ -145,7 +145,7 @@ Do not version it. The application obtains its values from `context.app_settings
 
 ## Encrypted secrets in frozen mode
 
-During build, Qyro CLI encrypts the entire `secrets.json` object; it does not distribute its source copy in plaintext. The runtime prefers `.qyro/secrets.enc` embedded inside `protected_resources.pak`. For compatibility, it also accepts the external encrypted `.qyro/secrets.json` file. In both cases, it requires a compiled `runtime*.so`, `.pyd`, or `.dylib` module with `RUNTIME_SECRET_HEX`.
+During build, Qyro CLI encrypts the entire `secrets.json` object; it does not distribute its source copy in plaintext. The runtime prefers `.qyro/secrets.enc` embedded inside `resources.pak`. For compatibility, it also accepts the external encrypted `.qyro/secrets.json` file. In both cases, it requires a compiled `runtime*.so`, `.pyd`, or `.dylib` module with `RUNTIME_SECRET_HEX`.
 
 The decrypted payload must be UTF-8, JSON, and an object. Unlike ordinary JSON files, an invalid encrypted secret raises `ValueError`/`SecretsCryptoError`, because silently continuing could start the application with incorrect credentials.
 
