@@ -38,23 +38,10 @@
             "group": "Qyro Engine",
             "pages": [
               "es/engine",
-              "es/application-context",
-              "es/components",
+              "es/velto-context",
               "es/settings",
               "es/resources",
               "es/source-frozen",
-              "es/frameworks",
-              {
-                "group": "Frameworks",
-                "pages": [
-                  "es/frameworks/pyside6",
-                  "es/frameworks/pyqt6",
-                  "es/frameworks/pyqt5",
-                  "es/frameworks/pyside2",
-                  "es/frameworks/tkinter",
-                  "es/frameworks/kivy"
-                ]
-              },
               "es/secrets",
               "es/protected-resources",
               "es/telemetry"
@@ -64,14 +51,6 @@
             "group": "Pydux: integración opcional",
             "pages": [
               "es/pydux"
-            ]
-          },
-          {
-            "group": "Demos",
-            "pages": [
-              "es/examples/pyside6",
-              "es/examples/kivy",
-              "es/examples/tkinter"
             ]
           },
           {
@@ -109,23 +88,10 @@
             "group": "Qyro Engine",
             "pages": [
               "en/engine",
-              "en/application-context",
-              "en/components",
+              "en/velto-context",
               "en/settings",
               "en/resources",
               "en/source-frozen",
-              "en/frameworks",
-              {
-                "group": "Frameworks",
-                "pages": [
-                  "en/frameworks/pyside6",
-                  "en/frameworks/pyqt6",
-                  "en/frameworks/pyqt5",
-                  "en/frameworks/pyside2",
-                  "en/frameworks/tkinter",
-                  "en/frameworks/kivy"
-                ]
-              },
               "en/secrets",
               "en/protected-resources",
               "en/telemetry"
@@ -135,12 +101,6 @@
             "group": "Pydux: Optional Integration",
             "pages": [
               "en/pydux"
-            ]
-          },
-          {
-            "group": "Demos",
-            "pages": [
-              "en/examples/pyside6"
             ]
           },
           {

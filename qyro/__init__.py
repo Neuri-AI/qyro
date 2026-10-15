@@ -4,8 +4,7 @@ Clean Architecture runtime engine and lifecycle framework for Python desktop GUI
 Decoupled from CLI tools, independent and multi-toolkit ready.
 """
 
-from qyro.client.context import ApplicationContext
-from qyro.client.component import Component
+from qyro.client.velto_context import VeltoContext
 from qyro.container import EngineContainer
 from qyro.adapters.platform.detector import PlatformDetector
 from qyro.domain.entities import PlatformType, ExecutionMode, AppMetadata
@@ -24,7 +23,7 @@ _default_container: EngineContainer | None = None
 
 def _get_default_container() -> EngineContainer:
     global _default_container
-    app_container = ApplicationContext._global_container
+    app_container = VeltoContext._global_container
     if app_container is not None:
         _default_container = app_container
         return app_container
@@ -35,7 +34,7 @@ def _get_default_container() -> EngineContainer:
 
 
 def get_resource(*segments: str, required: bool = True) -> str:
-    """Convenience helper to resolve resource path without manually creating ApplicationContext."""
+    """Convenience helper to resolve a resource path without a context instance."""
     container = _get_default_container()
     return str(container.resolve_resource_use_case.execute(*segments, required=required))
 
@@ -54,8 +53,7 @@ def is_frozen() -> bool:
 
 
 __all__ = [
-    "ApplicationContext",
-    "Component",
+    "VeltoContext",
     "EngineContainer",
     "PlatformDetector",
     "PlatformType",
