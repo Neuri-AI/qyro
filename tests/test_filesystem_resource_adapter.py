@@ -69,3 +69,32 @@ def test_resolve_keeps_working_for_structured_base_resources(tmp_path: Path) -> 
 
     assert result.exists is True
     assert result.absolute_path == target.resolve()
+
+
+def test_source_prefers_local_resources_over_protected_bundle(tmp_path: Path, monkeypatch) -> None:
+    local_target = tmp_path / "resources" / "images" / "logo.png"
+    local_target.parent.mkdir(parents=True)
+    local_target.write_text("local", encoding="utf-8")
+
+    protected_root = tmp_path / "protected"
+    protected_target = protected_root / "resources" / "images" / "logo.png"
+    protected_target.parent.mkdir(parents=True)
+    protected_target.write_text("protected", encoding="utf-8")
+
+    monkeypatch.setattr(
+        "qyro.adapters.resources.filesystem_resources.ProtectedResourceBundle.get_extracted_root",
+        lambda _: protected_root,
+    )
+
+    env = _FakeEnv(
+        root=tmp_path,
+        bundle=tmp_path / "_internal",
+        frozen=False,
+        platform=PlatformType.WINDOWS,
+    )
+    result = FileSystemResourceAdapter(env).resolve(
+        ResourceQuery.from_segments("images", "logo.png")
+    )
+
+    assert result.absolute_path == local_target.resolve()
+    assert result.absolute_path.read_text(encoding="utf-8") == "local"

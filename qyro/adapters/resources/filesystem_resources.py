@@ -56,10 +56,7 @@ class FileSystemResourceAdapter(IResourcePort):
         candidates: list[Path] = []
 
         if self._env.is_frozen():
-            protected_root = ProtectedResourceBundle.get_extracted_root(
-                self._env
-            )
-
+            protected_root = ProtectedResourceBundle.get_extracted_root(self._env)
             if protected_root is not None:
                 protected_resources = protected_root / "resources"
                 candidates.extend(
@@ -100,6 +97,16 @@ class FileSystemResourceAdapter(IResourcePort):
                     platform_dirs,
                 )
             )
+
+            protected_root = ProtectedResourceBundle.get_extracted_root(self._env)
+            if protected_root is not None:
+                protected_resources = protected_root / "resources"
+                candidates.extend(
+                    self._resource_directories(
+                        protected_resources,
+                        platform_dirs,
+                    )
+                )
 
         return self._existing_unique_directories(candidates)
 

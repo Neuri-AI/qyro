@@ -37,6 +37,9 @@ cython = ">=3.0.12,<4.0.0"
 # Example projects deliberately use the same test module names.  Import tests
 # by path so pytest does not treat them as one top-level ``test_project`` module.
 addopts = "--import-mode=importlib"
+# Ensure ``qyro`` resolves to this project's package directory when pytest is
+# launched from the monorepo root, rather than the sibling repository folder.
+pythonpath = ["."]
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

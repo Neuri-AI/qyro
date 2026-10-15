@@ -21,7 +21,7 @@ class JsonSettingsAdapter(ISettingsPort):
     """Loads and merges hierarchical JSON configuration files."""
 
     _SECRETS_FILE_NAME = "secrets.json"
-    _LEGACY_ENCRYPTED_SECRETS_FILE_NAME = "secrets.json"
+    _EXTERNAL_ENCRYPTED_SECRETS_FILE_NAME = "secrets.json"
 
     def __init__(self, env_port: IEnvironmentPort, custom_settings_dir: Path | None = None) -> None:
         self._env = env_port
@@ -132,8 +132,7 @@ class JsonSettingsAdapter(ISettingsPort):
             self._merge_decrypted_secrets_payload(plaintext, combined)
             return
 
-        # Backward compatibility with older bundles that shipped .qyro/secrets.json
-        encrypted_path = self._legacy_encrypted_secrets_path()
+        encrypted_path = self._external_encrypted_secrets_path()
         if not encrypted_path.exists():
             return
 
@@ -159,11 +158,11 @@ class JsonSettingsAdapter(ISettingsPort):
 
     def _find_runtime_module_for_encrypted_secrets(self) -> Path | None:
         root = self._env.get_bundle_dir() if self._env.is_frozen() else self._env.get_root_dir()
-        return find_runtime_secret_module(root / ".qyro")
+        return find_runtime_secret_module(root / ".velto")
 
-    def _legacy_encrypted_secrets_path(self) -> Path:
+    def _external_encrypted_secrets_path(self) -> Path:
         root = self._env.get_bundle_dir() if self._env.is_frozen() else self._env.get_root_dir()
-        return root / ".qyro" / self._LEGACY_ENCRYPTED_SECRETS_FILE_NAME
+        return root / ".velto" / self._EXTERNAL_ENCRYPTED_SECRETS_FILE_NAME
 
     def load_metadata(self) -> AppMetadata:
         raw = self.get_raw_settings()
@@ -171,7 +170,7 @@ class JsonSettingsAdapter(ISettingsPort):
             app_name=raw.get("app_name", "QyroApp"),
             version=raw.get("version", "1.0.0"),
             author=raw.get("author", "Developer"),
-            identifier=raw.get("identifier", "com.qyro.app"),
+            identifier=raw.get("identifier", "com.velto.app"),
             description=raw.get("description", ""),
             raw_settings=raw,
         )
