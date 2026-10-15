@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "qyro-engine"
-version = "1.0.0a2"
+version = "2.0.0a1"
 description = "Qyro Engine is the runtime engine for the Qyro ecosystem, providing the foundation for building and running Python applications across desktop and mobile platforms."
 authors = ["Qyro Team"]
 license = "MIT"
@@ -8,14 +8,15 @@ readme = "README.md"
 packages = [{include = "qyro"}]
 
 [tool.poetry.dependencies]
-python = ">=3.10,<3.16"
+python = ">=3.10,<3.14"
 cryptography = ">=45.0.0,<47.0.0"
+velto = ">=0.1.0,<1.0.0"
 
-PySide6 = {version = ">=6.5.0", optional = true, python = ">=3.11,<3.15"}
-PyQt6 = {version = ">=6.5.0", optional = true, python = ">=3.11,<3.15"}
-PySide2 = {version = ">=5.15.0", optional = true, python = "<3.11"}
-PyQt5 = {version = ">=5.15.0", optional = true, python = ">=3.11,<3.14"}
-kivy = {version = ">=2.2.0", optional = true}
+PySide6 = {version = ">=6.8", optional = true, python = "<3.14"}
+PyQt6 = {version = ">=6.8", optional = true, python = "<3.14"}
+PySide2 = {version = ">=5.15,<6", optional = true, python = "<3.11"}
+PyQt5 = {version = ">=5.15", optional = true, python = "<3.14"}
+kivy = {version = ">=2.3", optional = true}
 sentry-sdk = {version = ">=1.30.0", optional = true}
 
 [tool.poetry.extras]
@@ -31,6 +32,11 @@ all = ["PySide6", "PyQt6", "PySide2", "PyQt5", "kivy", "sentry-sdk"]
 pytest = ">=8.0.0"
 pytest-cov = ">=4.1.0"
 cython = ">=3.0.12,<4.0.0"
+
+[tool.pytest.ini_options]
+# Example projects deliberately use the same test module names.  Import tests
+# by path so pytest does not treat them as one top-level ``test_project`` module.
+addopts = "--import-mode=importlib"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

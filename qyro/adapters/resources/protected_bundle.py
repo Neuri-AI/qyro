@@ -45,7 +45,7 @@ class ProtectedResourceBundle:
     def get_extracted_root(cls, env_port: IEnvironmentPort) -> Path | None:
         """Return extracted root containing settings/ and resources/ when present."""
         base_dir = env_port.get_bundle_dir() if env_port.is_frozen() else env_port.get_root_dir()
-        package_path = base_dir / ".qyro" / "protected_resources.pak"
+        package_path = base_dir / ".qyro" / "resources.pak"
         secret_module_path = cls._find_runtime_secret_module(base_dir / ".qyro")
 
         if not package_path.exists() or secret_module_path is None:
@@ -66,9 +66,9 @@ class ProtectedResourceBundle:
 
     @classmethod
     def get_encrypted_secrets_payload(cls, env_port: IEnvironmentPort) -> bytes | None:
-        """Return encrypted secrets payload embedded in protected_resources.pak when available."""
+        """Return encrypted secrets payload embedded in resources.pak when available."""
         base_dir = env_port.get_bundle_dir() if env_port.is_frozen() else env_port.get_root_dir()
-        package_path = base_dir / ".qyro" / "protected_resources.pak"
+        package_path = base_dir / ".qyro" / "resources.pak"
         secret_module_path = cls._find_runtime_secret_module(base_dir / ".qyro")
 
         if not package_path.exists() or secret_module_path is None:

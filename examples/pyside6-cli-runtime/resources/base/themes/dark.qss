@@ -1,0 +1,40 @@
+QMainWindow, QWidget#appShell {
+    background: #10131d;
+    color: #e2e8f0;
+}
+QFrame#appHeader {
+    background: #181d2b;
+    border: 1px solid #30394c;
+    border-radius: 16px;
+}
+QLabel#appTitle { color: #f8fafc; font-size: 25px; font-weight: 700; }
+QLabel#appSubtitle, QLabel#pageDescription { color: #aab6ca; font-size: 13px; }
+QLabel#pageTitle { color: #f8fafc; font-size: 21px; font-weight: 700; }
+QLabel#eyebrow { color: #fdba74; font-size: 11px; font-weight: 700; }
+QTabWidget::pane { border: 0; top: -1px; }
+QTabBar::tab {
+    background: transparent; color: #aab6ca; padding: 10px 14px;
+    margin: 0 2px; border-bottom: 2px solid transparent;
+}
+QTabBar::tab:selected { color: #fed7aa; border-bottom-color: #ea580c; font-weight: 700; }
+QFrame#card {
+    background: #181d2b; border: 1px solid #30394c; border-radius: 12px;
+}
+QFrame#card QLabel { color: #dbe4f0; }
+QLabel#cardTitle { color: #f8fafc; font-size: 15px; font-weight: 700; }
+QLabel#muted, QLabel#devtoolsLink { color: #aab6ca; font-size: 12px; }
+QLineEdit#field {
+    background: #111722; border: 1px solid #46536b; border-radius: 8px;
+    color: #f8fafc; padding: 9px 10px;
+}
+QLineEdit#field:focus { border: 2px solid #fb923c; }
+QPushButton#primaryButton {
+    background: #ea580c; border: 0; border-radius: 8px; color: #ffffff;
+    font-weight: 700; padding: 9px 14px;
+}
+QPushButton#primaryButton:hover { background: #c2410c; }
+QPushButton#themeToggle {
+    background: #252d3e; border: 1px solid #46536b; border-radius: 8px;
+    color: #e2e8f0; font-weight: 600; padding: 8px 12px;
+}
+QPushButton#themeToggle:hover { background: #30394c; }

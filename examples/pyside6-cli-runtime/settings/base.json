@@ -1,0 +1,11 @@
+{
+    "app_name": "Qyro PySide6 Demos",
+    "author": "Qyro Team",
+    "entry_point": "main.py",
+    "addons": ["pydux"],
+    "version": "0.1.0",
+    "binding": "PySide6",
+    "hidden_imports": ["__future__"],
+    "window": {"width": 860, "height": 580},
+    "theme": "light"
+}

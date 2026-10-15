@@ -1,0 +1,28 @@
+{
+    "bundle_mode": "onedir",
+    "uac": {
+        "level": "asInvoker",
+        "ui_access": false
+    },
+    "debug": {
+        "enabled": false,
+        "console_window": false
+    },
+    "optimization": {
+        "strip_binaries": false,
+        "clean_build": false,
+        "upx_enabled": false,
+        "upx_level": 1,
+        "upx_excludes": [
+            "vcruntime140.dll",
+            "python3*.dll",
+            "Kivy.QtCore.pyd"
+        ],
+        "bytecode_opt": 0,
+        "exclude_modules": [
+            "unittest",
+            "test",
+            "pydoc"
+        ]
+    }
+}

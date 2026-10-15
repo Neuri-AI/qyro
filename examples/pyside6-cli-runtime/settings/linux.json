@@ -1,0 +1,28 @@
+{
+    "categories": "Utility;",
+    "description": "",
+    "author_email": "",
+    "url": "",
+    "bundle_mode": "onedir",
+    "debug": {
+        "enabled": false,
+        "console": false
+    },
+    "optimization": {
+        "strip_binaries": false,
+        "clean_build": false,
+        "upx_enabled": false,
+        "upx_level": 1,
+        "bytecode_opt": 0,
+        "upx_excludes": [
+            "libpython3*.so*",
+            "QtCore.abi3.so"
+        ],
+        "exclude_modules": [
+            "tkinter",
+            "unittest",
+            "test",
+            "pydoc"
+        ]
+    }
+}

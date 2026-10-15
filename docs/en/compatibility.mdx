@@ -1,0 +1,52 @@
+---
+title: "Compatibility and limitations"
+description: "Distinguish adapters, installation, and testing evidence."
+---
+
+An implemented adapter, an installable dependency, and a distributable application are different levels. This page describes the audited code, not a universal guarantee based on a README table.
+
+## Python and toolkits
+
+Engine and CLI declare Python `>=3.10,<3.16`; see the additional limits in [Installation](/en/installation). PySide2 has a real adapter and CLI hooks, but its Engine extra requires Python lower than 3.11. PyQt5 is declared for `>=3.11,<3.14`. The README presents broader results: those claims do not change the markers.
+
+Validation used Windows and Python 3.13.16 in Conda `playground`. PyQt6 and PySide2 were not installed: their examples were reviewed against the adapters and compiled syntactically, without claiming local graphical execution.
+
+## Platforms
+
+`PlatformDetector` identifies Windows (`sys.platform` starts with `win`), macOS (`darwin`), Linux, and values starting with `android`. Android may appear as Linux in some interpreters; the detector does not implement another heuristic. `PlatformType.IOS` exists, but there is no branch that produces it. Other systems result in `UNKNOWN`.
+
+Ubuntu, Fedora, and Arch/Manjaro are queried through `/etc/os-release`; GNOME/KDE through `XDG_CURRENT_DESKTOP`. There is no CPU architecture detection in the detector, despite the comment in its module.
+
+## Mobile and other environments
+
+The CLI accepts iPhone/Android scaffolding and declares a `mobile` extra with Buildozer. `BuildCommand` looks for `mobile_build_use_case`, but the container does not configure it. `qyro build --target android` or `ios` returns an error. There is no complete mobile workflow connected in the checkout.
+
+`ExecutionMode.EMBEDDED` is not produced by the detector. Generic frozen mode provides detection and basic paths, not specific validation for every alternative freezer.
+
+## Runtime limitations
+
+- The first initialization fixes the global context; there is no public reset or toolkit switching.
+- Settings are merged shallowly, without schema, persistence, or public hot reload.
+- An importable toolkit does not imply a usable display or OpenGL environment.
+- `Component` has synchronous hooks, without reactive reconciliation or automatic unmount.
+- QSS and `resizeEvent` are Qt integrations; Tkinter/Kivy require their native mechanisms.
+- `get_resource` does not restrict paths to a sandbox; validate untrusted inputs before querying them.
+- Icons, titles, and styles silence several errors; a true icon boolean does not guarantee that it is displayed.
+- Protection does not absolutely hide data from the client or force termination on every form of tampering.
+
+## Tooling limitations
+
+- `init` requires external templates or cache; there is no included fallback in this checkout.
+- `start` does not automatically activate Poetry/uv environments or implement a watcher.
+- Build uses local PyInstaller/Cython; `--target` does not provide cross-compilation.
+- The CLI may require Pillow even without installing `desktop`.
+- `clean` does not remove `.qyro`, template cache, or protected extraction.
+- It does not automatically separate tooling secrets from client secrets.
+- Bundle copies source resources by default; it may require `--no-resources`.
+- There are no registered publish, remote deployment, upload, or test commands.
+
+## Test and workflow evidence
+
+The suites test APIs and adapters, often with doubles; they do not test every desktop and binding. The CLI matrix workflow lists Windows, macOS, and Linux, Python 3.10–3.13, and PySide6, PyQt6, PyQt5, Kivy, and Tkinter. It does not include PySide2 or Python 3.14 in the audited YAML. It also omits `start` for Kivy on Windows/macOS. The README's general claim of all stages across all cells is not reproduced as a guarantee; remote results were not verified here.
+
+Build and test on every target system, distribute the complete artifact, and verify your application's actual features. For known failures and diagnostic steps, see [Troubleshooting](/en/troubleshooting).

@@ -1,0 +1,19 @@
+{
+    "bundle_mode": "onedir",
+    "bundle_identifier": "None",
+    "debug": {
+        "enabled": false,
+        "console": false
+    },
+    "optimization": {
+        "strip_binaries": false,
+        "clean_build": false,
+        "upx_enabled": false,
+        "bytecode_opt": 1,
+        "exclude_modules": [
+            "unittest",
+            "test",
+            "pydoc"
+        ]
+    }
+}

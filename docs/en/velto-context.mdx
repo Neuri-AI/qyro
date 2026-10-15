@@ -1,0 +1,66 @@
+---
+title: "VeltoContext"
+description: "Run a PSX interface from Qyro settings."
+---
+
+`VeltoContext` is Qyro's UI entry point. It loads settings, resources and
+telemetry, then creates the selected Velto renderer. UI components belong to
+Velto: use `psx()` and `@component`, not Qyro widget classes.
+
+```python
+import sys
+from qyro import VeltoContext
+from psx import component, psx
+
+@component
+def Notice():
+    return psx("<Text>Rendered by Velto.</Text>")
+
+class MyApp(VeltoContext):
+    def render(self):
+        return psx('''
+            <Flex direction="column" align_items="center" width="100%">
+                <Text>Hello, Velto!</Text>
+                <Notice />
+            </Flex>
+        ''')
+
+if __name__ == "__main__":
+    sys.exit(MyApp().run())
+```
+
+`mount()` returns the native Velto handle, `run()` mounts once and enters the
+renderer loop, and `unmount()` disposes the PSX tree. Contexts also expose
+`metadata`, `app_settings`, `get_resource()`, `platform`, `is_frozen`, and
+`execution_mode`.
+
+`VeltoContext` compiles its `render()` method inside a PSX component boundary.
+Root views can therefore use `use_state`, JSX-style conditionals, and Python
+f-strings exactly like ordinary `@component` functions. Do not decorate the
+method itself with `@component`.
+
+## Settings
+
+`framework` selects one of `PySide6`, `PySide2`, `PyQt6`, `PyQt5`, `Kivy`, or
+`Tkinter`; `binding` is accepted as a legacy fallback. `framework` wins when
+both exist. `window.width` and `window.height` define both the initial native
+window size and the Velto SFLE viewport.
+
+```json
+{
+  "app_name": "Example",
+  "framework": "PySide6",
+  "window": {"width": 800, "height": 600},
+  "icon": "icons/app.png"
+}
+```
+
+Both dimensions must be positive integers. If `window` is missing or invalid,
+Qyro uses `800×600`. Qyro applies `app_name` as the title and resolves `icon`
+or `app_icon` from resources before presenting the Velto root.
+
+## Breaking migration
+
+`ApplicationContext`, `Component`, `qyro.ui`, and Qyro framework adapters were
+removed. Replace native-window multiple inheritance and lifecycle hooks with a
+`VeltoContext` subclass whose `render()` returns a PSX VNode.

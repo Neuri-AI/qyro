@@ -1,0 +1,10 @@
+__pycache__/
+build/
+release/
+settings/secrets.json
+*.pyc
+*.pyo
+*.pyd
+.env
+*.env
+.DS_Store

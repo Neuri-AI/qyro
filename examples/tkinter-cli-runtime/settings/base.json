@@ -1,0 +1,11 @@
+{
+    "app_name": "Qyro Tkinter Demos",
+    "author": "Qyro Team",
+    "entry_point": "main.py",
+    "addons": ["pydux"],
+    "version": "0.1.0",
+    "binding": "Tkinter",
+    "hidden_imports": ["__future__"],
+    "window": {"width": 980, "height": 680},
+    "theme": "light"
+}

@@ -11,7 +11,6 @@ from qyro.application.ports.environment import IEnvironmentPort
 from qyro.application.ports.resources import IResourcePort
 from qyro.application.ports.settings import ISettingsPort
 from qyro.application.ports.telemetry import ITelemetryPort
-from qyro.application.ports.ui_framework import IUIFrameworkPort
 
 # Adapters
 from qyro.adapters.environment.system_environment import SystemEnvironmentAdapter
@@ -19,7 +18,6 @@ from qyro.adapters.resources.filesystem_resources import FileSystemResourceAdapt
 from qyro.adapters.settings.json_settings import JsonSettingsAdapter
 from qyro.adapters.telemetry.console_hook import ConsoleExceptionHookAdapter
 from qyro.adapters.telemetry.sentry_hook import SentryExceptionHookAdapter
-from qyro.adapters.frameworks.factory import FrameworkFactory
 
 # Use Cases
 from qyro.application.use_cases.resolve_resource import ResolveResourceUseCase
@@ -32,7 +30,6 @@ class EngineContainer:
 
     def __init__(
         self,
-        framework_name: Optional[str] = None,
         custom_root: Optional[Path] = None,
         custom_resources_dir: Optional[Path] = None,
         custom_settings_dir: Optional[Path] = None,
@@ -59,21 +56,11 @@ class EngineContainer:
         else:
             self.telemetry_adapter = ConsoleExceptionHookAdapter()
 
-        # Framework Driver:
-        # Automatically infer from base.json "binding" or "framework" if not explicitly specified
-        effective_framework = (
-            framework_name
-            or raw_settings.get("binding")
-            or raw_settings.get("framework")
-        )
-        self.framework_adapter: IUIFrameworkPort = FrameworkFactory.create(effective_framework)
-
         # 2. Initialize Use Cases (Application Core)
         self.resolve_resource_use_case = ResolveResourceUseCase(self.resource_adapter)
         self.load_settings_use_case = LoadSettingsUseCase(self.settings_adapter)
         self.initialize_engine_use_case = InitializeEngineUseCase(
             env_port=self.env_adapter,
             settings_port=self.settings_adapter,
-            framework_port=self.framework_adapter,
             telemetry_port=self.telemetry_adapter,
         )

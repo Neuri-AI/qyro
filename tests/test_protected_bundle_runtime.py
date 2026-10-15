@@ -105,7 +105,7 @@ def _write_protected_package(
     ciphertext = _xor_keystream(payload, key=key, nonce=nonce)
     tag = hmac.new(key, nonce + ciphertext, hashlib.sha256).digest()
 
-    (qyro_dir / "protected_resources.pak").write_bytes(
+    (qyro_dir / "resources.pak").write_bytes(
         _MAGIC + salt + wrapped_key + nonce + tag + ciphertext
     )
     return runtime_secret_value
@@ -124,7 +124,7 @@ def test_json_settings_adapter_loads_base_from_protected_package(tmp_path: Path)
 
 def test_protected_bundle_does_not_trust_precreated_legacy_temp_directory(tmp_path: Path) -> None:
     _write_protected_package(tmp_path)
-    package_path = tmp_path / ".qyro" / "protected_resources.pak"
+    package_path = tmp_path / ".qyro" / "resources.pak"
     digest = hashlib.sha256(package_path.read_bytes()).hexdigest()[:16]
     attacker_root = Path(tempfile.gettempdir()) / f"qyro_protected_{digest}"
     attacker_settings = attacker_root / "settings"
@@ -284,7 +284,7 @@ def test_runtime_rejects_tampered_embedded_secrets_payload(tmp_path: Path) -> No
 
 def test_runtime_rejects_tampered_protected_package_integrity(tmp_path: Path) -> None:
     _write_protected_package(tmp_path)
-    pak_path = tmp_path / ".qyro" / "protected_resources.pak"
+    pak_path = tmp_path / ".qyro" / "resources.pak"
     tampered = bytearray(pak_path.read_bytes())
     tampered[-1] ^= 0x01
     pak_path.write_bytes(bytes(tampered))

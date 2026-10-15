@@ -23,19 +23,16 @@
 
 
 > [!NOTE]
-> **Need the Qyro automation and build tools?** This repository contains the **Qyro Runtime**, which provides the application context, framework adapters, resource handling, and component lifecycle for Python GUI applications. For **project scaffolding, build automation, packaging, distribution, code signing, and release workflows**, see **[Qyro CLI](https://github.com/Neuri-AI/qyro-cli)**.
+> **Need the Qyro automation and build tools?** This repository contains the **Qyro Runtime**, which provides Velto startup, settings, resource handling, and telemetry for Python GUI applications. For **project scaffolding, build automation, packaging, distribution, code signing, and release workflows**, see **[Qyro CLI](https://github.com/Neuri-AI/qyro-cli)**.
 
 
 ## What it is
 
-Qyro currently provides:
+Qyro provides:
 
-- A runtime container that wires settings, resource lookup, telemetry hook, and UI adapter.
-- A single ApplicationContext API for Qt, Tkinter, and Kivy style apps.
-- Automatic settings loading from JSON files.
-- Resource resolution that works in source mode and frozen mode.
-- A component lifecycle mixin for UI classes with flexible property handling.
-- Runtime loading of encrypted secrets payloads (AES-256-GCM + HKDF-SHA256) embedded inside `protected_resources.pak` when present.
+- `VeltoContext`, a PSX/Velto application entry point configured from `settings/base.json`.
+- Automatic settings loading, resource resolution, telemetry, and runtime environment information.
+- Runtime loading of encrypted secrets payloads (AES-256-GCM + HKDF-SHA256) embedded inside `resources.pak` when present.
 
 ## What it is not
 
@@ -44,9 +41,9 @@ Qyro is not the build/distribution CLI.
 - Build, bundle, signing, notarization: qyro-cli concern.
 - Web bridge APIs from legacy PPG examples: not part of qyro public API.
 
-## Supported UI adapters
+## Velto renderers
 
-Framework adapters available in the engine:
+Velto renderers selected from `framework`:
 
 - PySide6
 - PyQt6
@@ -54,13 +51,46 @@ Framework adapters available in the engine:
 - PyQt5
 - Kivy
 - Tkinter
-- Headless fallback
 
-Adapter selection behavior:
+`framework` is required (`binding` is a legacy fallback); Qyro never
+auto-detects a toolkit. It builds the corresponding Velto renderer with the
+size defined by `window.width` and `window.height`, or `800×600` when the
+window block is missing or invalid.
 
-- If binding/framework is provided in settings, it is used.
-- Otherwise the engine auto-detects in this order:
-  PySide6 -> PyQt6 -> PySide2 -> PyQt5 -> Kivy -> Tkinter -> Headless
+## Quick start
+
+```python
+import sys
+from qyro import VeltoContext
+from psx import component, psx
+
+@component
+def MyComponent():
+    return psx("<Text>This is a child component!</Text>")
+
+class MyApp(VeltoContext):
+    def render(self):
+        return psx('''
+            <Flex direction="column" align_items="center" width="100%">
+                <Text>Hello, Velto!</Text>
+                <MyComponent />
+            </Flex>
+        ''')
+
+if __name__ == "__main__":
+    sys.exit(MyApp().run())
+```
+
+```json
+{
+  "app_name": "Example",
+  "framework": "PySide6",
+  "window": {"width": 800, "height": 600}
+}
+```
+
+`ApplicationContext`, `Component`, `qyro.ui`, and Qyro-owned framework
+adapters have been removed. UI components are now exclusively Velto components.
 
 ## Compatibility
 
@@ -186,7 +216,7 @@ the complete object, and packages it for the Engine to load at runtime:
 ```text
 my-app/
 └─ .qyro/
-    ├─ protected_resources.pak
+    ├─ resources.pak
     ├─ runtime*.so|runtime*.pyd
 
 ```
