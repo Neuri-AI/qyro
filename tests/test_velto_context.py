@@ -95,6 +95,17 @@ class _Example(VeltoContext):
         return "root-vnode"
 
 
+class _Store:
+    def get_state(self) -> object:
+        return {}
+
+    def dispatch(self, action: object) -> object:
+        return action
+
+    def select(self, **_: object) -> object:
+        return lambda: None
+
+
 @pytest.mark.parametrize(
     ("window", "expected"),
     [
@@ -135,9 +146,9 @@ def test_mount_run_and_unmount_delegate_to_velto(monkeypatch: pytest.MonkeyPatch
     context = _Example()
 
     assert context.run() == 23
-    assert context.render_calls == 0
+    assert context.render_calls == 1
     assert context.app is _App.instances[0]
-    assert callable(context.app.root)
+    assert context.app.root == "root-vnode"
     assert context.renderer is renderer
     assert context.handle is not None
     assert context.mount() is context.handle
@@ -146,6 +157,40 @@ def test_mount_run_and_unmount_delegate_to_velto(monkeypatch: pytest.MonkeyPatch
     context.unmount()
     assert _App.instances[0].unmount_calls == 1
     assert context.handle is None
+
+
+def test_context_automatically_provides_the_single_module_pydux_store(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    store = _Store()
+    renderer = _Renderer()
+    monkeypatch.setitem(_Example.render.__globals__, "demo_store", store)
+    monkeypatch.setitem(
+        sys.modules,
+        "pydux",
+        types.SimpleNamespace(StoreProvider=lambda provided, child: ("provider", provided, child)),
+    )
+    bind_context({"framework": "headless"})
+    monkeypatch.setattr(_Example, "_create_renderer", lambda *_: renderer)
+    monkeypatch.setattr(_Example, "_present", lambda *_: None)
+
+    _Example().mount()
+
+    root = _App.instances[0].root
+    assert root[0] == "provider"
+    assert root[1] is store
+    monkeypatch.delitem(_Example.render.__globals__, "demo_store")
+
+
+def test_context_requires_an_explicit_store_when_the_module_has_multiple(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setitem(_Example.render.__globals__, "first_store", _Store())
+    monkeypatch.setitem(_Example.render.__globals__, "second_store", _Store())
+    with pytest.raises(RuntimeError, match="More than one Pydux store"):
+        _Example()._pydux_store()
+    monkeypatch.delitem(_Example.render.__globals__, "first_store")
+    monkeypatch.delitem(_Example.render.__globals__, "second_store")
 
 
 def test_qt_presentation_uses_the_host_window() -> None:

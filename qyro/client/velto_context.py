@@ -156,6 +156,29 @@ class VeltoContext:
         root.__qualname__ = root.__name__
         return component(root)
 
+    def _pydux_store(self) -> object | None:
+        """Return the sole Pydux-compatible store declared by the view module.
+
+        The store provider is an application boundary, so it must wrap the
+        PSX root before the root component evaluates hooks. Keeping discovery
+        here lets a ``VeltoContext.render`` method use Pydux hooks directly
+        without a provider or an otherwise artificial child component.
+        """
+        explicit = getattr(self, "pydux_store", None)
+        if explicit is not None:
+            if not _is_pydux_store(explicit):
+                raise TypeError("pydux_store must be a Pydux-compatible store.")
+            return explicit
+
+        namespace = getattr(type(self).render, "__globals__", {})
+        stores = {id(value): value for value in namespace.values() if _is_pydux_store(value)}
+        if len(stores) <= 1:
+            return next(iter(stores.values()), None)
+        raise RuntimeError(
+            "More than one Pydux store is declared in this module; "
+            "set pydux_store on the VeltoContext subclass."
+        )
+
     def _create_renderer(self, binding: str, width: int, height: int) -> Any:
         supported = {"pyside6", "pyside2", "pyqt6", "pyqt5", "kivy", "tkinter"}
         if binding not in supported:
@@ -212,7 +235,20 @@ class VeltoContext:
         except ImportError as exc:  # pragma: no cover - packaging boundary
             raise FrameworkNotAvailableError("Velto", "Install qyro-engine with Velto available.") from exc
 
-        app = App(self._root_component(), renderer=renderer)
+        # ``component`` returns a ComponentType. Calling it creates the VNode
+        # that a provider can safely receive as its single child.
+        root = self._root_component()()
+        store = self._pydux_store()
+        if store is not None:
+            try:
+                from pydux import StoreProvider
+            except ImportError as exc:  # pragma: no cover - packaging boundary
+                raise FrameworkNotAvailableError(
+                    "Pydux", "Install Pydux with its PSX integration available."
+                ) from exc
+            root = StoreProvider(store, root)
+
+        app = App(root, renderer=renderer)
         handle = app.mount()
         self._app, self._renderer, self._handle, self._mounted = app, renderer, handle, True
         self._present(binding, width, height)
@@ -292,3 +328,10 @@ class VeltoContext:
     def run(self) -> int:
         self.mount()
         return self._renderer.run()
+
+
+def _is_pydux_store(value: object) -> bool:
+    """Recognize Pydux's public store protocol without a hard dependency."""
+    return not isinstance(value, type) and all(
+        callable(getattr(value, name, None)) for name in ("get_state", "dispatch", "select")
+    )
