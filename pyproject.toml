@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "qyro-engine"
-version = "2.0.0a1"
+version = "0.1.0"
 description = "Qyro Engine is the runtime engine for the Qyro ecosystem, providing the foundation for building and running Python applications across desktop and mobile platforms."
 authors = ["Qyro Team"]
 license = "MIT"
@@ -8,7 +8,7 @@ readme = "README.md"
 packages = [{include = "qyro"}]
 
 [tool.poetry.dependencies]
-python = ">=3.10,<3.14"
+python = ">=3.10,<3.13.20"
 cryptography = ">=45.0.0,<47.0.0"
 velto = ">=0.1.0,<1.0.0"
 
