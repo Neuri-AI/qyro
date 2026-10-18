@@ -5,6 +5,10 @@ Decoupled from CLI tools, independent and multi-toolkit ready.
 """
 
 from qyro.client.context import ApplicationContext
+
+# Preserve the approved public Velto facade identity without a wrapper.
+# The implementation remains ApplicationContext until the PSX mount API is integrated.
+VeltoContext = ApplicationContext
 from qyro.client.component import Component
 from qyro.container import EngineContainer
 from qyro.adapters.platform.detector import PlatformDetector
@@ -55,6 +59,7 @@ def is_frozen() -> bool:
 
 __all__ = [
     "ApplicationContext",
+    "VeltoContext",
     "Component",
     "EngineContainer",
     "PlatformDetector",
