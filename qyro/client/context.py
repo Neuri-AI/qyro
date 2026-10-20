@@ -10,13 +10,13 @@ from qyro.domain.entities import AppMetadata, ExecutionMode, PlatformType
 
 
 class ApplicationContext:
-    stylesheets: tuple[str, ...] = ()
-
     """
     Primary user-facing context orchestrating application lifecycle,
     resource discovery and settings.
     Supports standalone instantiation and multiple-inheritance Mixin with QMainWindow.
     """
+
+    stylesheets: tuple[str, ...] = ()
 
     _global_container: Optional[EngineContainer] = None
     _global_boot_info: Optional[Dict[str, Any]] = None
