@@ -18,5 +18,5 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - run: python -m pip install -e . pytest
+      - run: python -m pip install -e . --no-deps pytest
       - run: python -m pytest -q tests/test_velto_css_resources.py
