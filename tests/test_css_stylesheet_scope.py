@@ -47,3 +47,43 @@ def test_class_level_stylesheets_scope_render_without_init_override(monkeypatch,
         ("render", True),
         ("released", True),
     ]
+
+
+def test_project_settings_precede_class_stylesheets(monkeypatch, tmp_path):
+    (tmp_path / "global.css").write_text("div {width: 10px}", encoding="utf-8")
+    (tmp_path / "local.css").write_text("div {width: 20px}", encoding="utf-8")
+    observed = []
+
+    @contextmanager
+    def scope(paths, *, resolver):
+        observed.append(tuple(paths))
+        observed.append(resolver("local.css"))
+        yield
+
+    package = types.ModuleType("psx")
+    css = types.ModuleType("psx.css")
+    css.__path__ = []
+    module = types.ModuleType("psx.css.context")
+    module.scoped_css_resources = scope
+    monkeypatch.setitem(sys.modules, "psx", package)
+    monkeypatch.setitem(sys.modules, "psx.css", css)
+    monkeypatch.setitem(sys.modules, "psx.css.context", module)
+
+    class Demo(ApplicationContext):
+        stylesheets = ["local.css"]
+
+        def get_resource(self, path):
+            return str(tmp_path / path)
+
+        def render(self):
+            return "ready"
+
+    settings = types.SimpleNamespace(raw_settings={"css": {"stylesheets": ["global.css"]}})
+    use_case = types.SimpleNamespace(execute=lambda: settings)
+    instance = object.__new__(Demo)
+    instance._container = types.SimpleNamespace(load_settings_use_case=use_case)
+    assert Demo.render(instance) == "ready"
+    assert observed == [
+        ("global.css", "local.css"),
+        b"div {width: 20px}",
+    ]
