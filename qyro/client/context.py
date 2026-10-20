@@ -106,13 +106,23 @@ class ApplicationContext:
                 except ImportError:
                     return authored_render(self, *args, **kwargs)
                 selected = getattr(self, "stylesheets", ())
+                config_sources: object = ()
+                container = getattr(self, "_container", None)
+                if container is not None:
+                    build = container.load_settings_use_case.execute().raw_settings
+                    css_config = build.get("css", {}) if isinstance(build, dict) else {}
+                    if not isinstance(css_config, dict):
+                        raise TypeError("Qyro settings css must be a mapping.")
+                    config_sources = css_config.get("stylesheets", ())
+                if not isinstance(config_sources, (tuple, list)) or not all(isinstance(x, str) for x in config_sources):
+                    raise TypeError("Qyro css.stylesheets must contain resource paths.")
                 if not isinstance(selected, (tuple, list)) or not all(isinstance(x, str) for x in selected):
                     raise TypeError("VeltoContext.stylesheets must contain CSS resource paths.")
                 # Paths returned by the Qyro public resource API work in dev/frozen
                 # layouts without requiring clients to inspect sys._MEIPASS.
                 def resolve(name: str) -> bytes:
                     return Path(self.get_resource(name)).read_bytes()
-                with scoped_css_resources(selected, resolver=resolve):
+                with scoped_css_resources((*config_sources, *selected), resolver=resolve):
                     return authored_render(self, *args, **kwargs)
             render_with_styles._qyro_css_wrapped = True
             cls.render = render_with_styles
