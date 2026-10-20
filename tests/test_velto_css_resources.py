@@ -33,10 +33,16 @@ def test_global_css_scope_uses_resolved_assets_and_preserves_render(tmp_path, mo
     instance._compiled = None
     # Avoid running the native engine; inspect the component wrapper.
     # Fake compile_component/component to invoke the root callable in isolation.
-    import psx
-    import psx.markup.component_compiler as compiler
-    monkeypatch.setattr(compiler, "compile_component", lambda value: value)
-    monkeypatch.setattr(psx, "component", lambda value: value)
+    psx = types.ModuleType("psx")
+    psx.__path__ = []
+    psx.component = lambda value: value
+    markup = types.ModuleType("psx.markup")
+    markup.__path__ = []
+    compiler = types.ModuleType("psx.markup.component_compiler")
+    compiler.compile_component = lambda value: value
+    monkeypatch.setitem(sys.modules, "psx", psx)
+    monkeypatch.setitem(sys.modules, "psx.markup", markup)
+    monkeypatch.setitem(sys.modules, "psx.markup.component_compiler", compiler)
     monkeypatch.setattr(Example, "app_settings", property(lambda _: {"css": {"stylesheets": ["reset.css"]}}))
     root = instance._root_component()
     assert root() == "view"
