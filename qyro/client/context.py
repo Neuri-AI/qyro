@@ -10,6 +10,8 @@ from qyro.domain.entities import AppMetadata, ExecutionMode, PlatformType
 
 
 class ApplicationContext:
+    stylesheets: tuple[str, ...] = ()
+
     """
     Primary user-facing context orchestrating application lifecycle,
     resource discovery and settings.
@@ -95,6 +97,25 @@ class ApplicationContext:
         the engine context, metadata, and QApplication are guaranteed to exist before and during __init__.
         """
         super().__init_subclass__(**kwargs)
+        # Optional PSX CSS binding preserves the existing init and event-loop lifecycle.
+        authored_render = cls.__dict__.get("render")
+        if callable(authored_render) and not getattr(authored_render, "_qyro_css_wrapped", False):
+            def render_with_styles(self: Any, *args: Any, **kwargs: Any) -> Any:
+                try:
+                    from psx.css.context import scoped_css_resources
+                except ImportError:
+                    return authored_render(self, *args, **kwargs)
+                selected = getattr(self, "stylesheets", ())
+                if not isinstance(selected, (tuple, list)) or not all(isinstance(x, str) for x in selected):
+                    raise TypeError("VeltoContext.stylesheets must contain CSS resource paths.")
+                # Paths returned by the Qyro public resource API work in dev/frozen
+                # layouts without requiring clients to inspect sys._MEIPASS.
+                def resolve(name: str) -> bytes:
+                    return Path(self.get_resource(name)).read_bytes()
+                with scoped_css_resources(selected, resolver=resolve):
+                    return authored_render(self, *args, **kwargs)
+            render_with_styles._qyro_css_wrapped = True
+            cls.render = render_with_styles
         orig_init = cls.__init__
 
         if not getattr(orig_init, "_qyro_wrapped", False):
