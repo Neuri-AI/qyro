@@ -16,7 +16,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: Neuri-AI/PSX
-          ref: 207b3dc28fa2c8af3b4b70293a198cdb651a03f5
+          ref: c110cfeb86232cbd3b4161b9d2f2adef815ae347
           path: partner-psx
       - run: python -m pip install -e partner-psx --no-deps
       - run: python -m pytest -q tests/test_development_settings.py tests/test_development_changes.py tests/test_development_refresh_dispatch.py tests/test_coordinated_context_refresh.py tests/test_velto_context.py
