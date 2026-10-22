@@ -153,6 +153,8 @@ class VeltoContext:
         if render_method is VeltoContext.render:
             raise NotImplementedError("VeltoContext subclasses must implement render().")
         compiled_render = compile_component(render_method)
+        compiled = [compiled_render]
+        self._development_render = compiled
 
         def root() -> Any:
             # Keep source binding active whenever the component re-evaluates.
@@ -179,11 +181,13 @@ class VeltoContext:
             with scoped_css_resources(
                 (*settings_sheets, *class_sheets), resolver=read_resource,
             ):
-                return compiled_render(self)
+                return compiled[0](self)
 
         root.__name__ = f"{type(self).__name__}Root"
         root.__qualname__ = root.__name__
-        return component(root)
+        definition = component(root)
+        self._development_root_definition = definition
+        return definition
 
     def _pydux_store(self) -> object | None:
         """Return the sole Pydux-compatible store declared by the view module.
@@ -359,9 +363,31 @@ class VeltoContext:
             return
         from .development_changes import DevelopmentChangeReceiver
 
-        receiver = DevelopmentChangeReceiver(self._development_changes.append)
+        receiver = DevelopmentChangeReceiver(self._on_development_change)
         receiver.start()
         self._development_receiver = receiver
+
+    def _on_development_change(self, paths: tuple[str, ...]) -> None:
+        """Dispatch refresh to the GUI owner thread, never the IPC thread."""
+        if not self._mounted or self._renderer is None:
+            return
+        renderer = self._renderer
+        renderer.schedule_ui(lambda: self._apply_development_change(paths))
+
+    def _apply_development_change(self, paths: tuple[str, ...]) -> None:
+        """Prepare compatible source edits and reevaluate the mounted root."""
+        if not self._mounted or self._app is None:
+            return
+        import os
+        from psx.devtools.coordinated_refresh import refresh_context_source
+        source = os.environ.get("PSX_SOURCE_ENTRY")
+        if not source:
+            return
+        try:
+            refresh_context_source(self, Path(source), paths)
+        except Exception as exc:
+            import logging
+            logging.getLogger("qyro.development").warning("Source refresh rejected: %s", exc)
 
     def unmount(self) -> None:
         if self._development_receiver is not None:
