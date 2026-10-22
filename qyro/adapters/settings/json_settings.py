@@ -104,7 +104,7 @@ class JsonSettingsAdapter(ISettingsPort):
                 if p_file.exists():
                     try:
                         with open(p_file, "r", encoding="utf-8") as f:
-                            combined.update(json.load(f))
+                            self._merge(combined, json.load(f))
                         break
                     except Exception:
                         pass
