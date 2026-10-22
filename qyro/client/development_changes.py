@@ -40,10 +40,13 @@ class DevelopmentChangeReceiver:
         self._thread.start()
 
     def _listen(self):
+        connection = self._connection
+        if connection is None:
+            return
         data = bytearray()
         while not self._stop.is_set():
             try:
-                chunk = self._connection.recv(4096)
+                chunk = connection.recv(4096)
             except socket.timeout:
                 continue
             except OSError:
