@@ -6,6 +6,8 @@ native renderer and event loop.
 
 from __future__ import annotations
 
+from collections import deque
+
 from pathlib import Path
 from typing import Any, ClassVar, Mapping, Optional
 
@@ -42,7 +44,7 @@ class VeltoContext:
         self._handle: Any = None
         self._mounted = False
         self._development_receiver = None
-        self._development_changes = []
+        self._development_changes = deque(maxlen=128)
         self._argv = (VeltoContext._global_boot_info or {}).get("argv")
 
     @classmethod
