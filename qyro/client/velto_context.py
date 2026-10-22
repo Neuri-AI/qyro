@@ -383,6 +383,31 @@ class VeltoContext:
         source = os.environ.get("PSX_SOURCE_ENTRY")
         if not source:
             return
+        # A changed native module already mapped into this interpreter cannot
+        # safely be reloaded. A first import is not an unsafe replacement.
+        from importlib.machinery import EXTENSION_SUFFIXES
+        import sys
+        root = Path(os.environ.get("VELTO_PROJECT_ROOT", Path(source).parent)).resolve()
+        changed = set()
+        for relative in paths:
+            candidate = (root / relative).resolve()
+            if candidate.is_relative_to(root):
+                changed.add(candidate)
+        native_changes = {path for path in changed if any(
+            path.name.endswith(suffix) for suffix in EXTENSION_SUFFIXES
+        )}
+        if native_changes:
+            loaded_native = {
+                Path(filename).resolve()
+                for module in tuple(sys.modules.values())
+                if isinstance((filename := getattr(module, "__file__", None)), str)
+                and any(filename.endswith(suffix) for suffix in EXTENSION_SUFFIXES)
+            }
+            if native_changes & loaded_native:
+                receiver = self._development_receiver
+                if receiver is not None:
+                    receiver.request_restart("loaded_native_extension_changed")
+                return
         # Snapshot only explicitly opted-in, JSON-compatible Pydux state.
         store = None
         snapshot = None
