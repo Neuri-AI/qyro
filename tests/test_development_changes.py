@@ -46,3 +46,16 @@ def test_missing_endpoint_never_starts_receiver(monkeypatch):
     receiver.start()
     assert receiver._thread is None
     receiver.stop()
+
+
+def test_frozen_context_never_allocates_notification_transport(monkeypatch):
+    from qyro.client.velto_context import VeltoContext
+
+    monkeypatch.setenv("VELTO_DEVELOPMENT", "1")
+    monkeypatch.setenv("VELTO_RELOAD_ENDPOINT", "127.0.0.1:40000")
+    monkeypatch.setenv("VELTO_RELOAD_TOKEN", "test")
+    monkeypatch.setattr(VeltoContext, "_global_boot_info", {"is_frozen": True})
+    context = object.__new__(VeltoContext)
+    context._development_receiver = None
+    context._start_development_receiver()
+    assert context._development_receiver is None
