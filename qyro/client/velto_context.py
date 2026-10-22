@@ -383,9 +383,34 @@ class VeltoContext:
         source = os.environ.get("PSX_SOURCE_ENTRY")
         if not source:
             return
+        # Snapshot only explicitly opted-in, JSON-compatible Pydux state.
+        store = None
+        snapshot = None
+        settings = self.app_settings.get("hot_reload", {})
+        if isinstance(settings, dict) and settings.get("preserve_state") is True:
+            try:
+                from pydux.devtools.state_snapshot import capture_store_state
+                store = self._pydux_store()
+                if store is not None:
+                    snapshot = capture_store_state(store)
+            except (ImportError, TypeError, ValueError):
+                store = None
+                snapshot = None
         try:
             refresh_context_source(self, Path(source), paths)
         except Exception as exc:
+            # Cleanup may fail after a replacement has already committed.
+            reconciler = getattr(self._app, "reconciler", None)
+            committed = bool(getattr(reconciler, "_coordinated_remount_applied", False))
+            if store is not None and snapshot is not None and not committed:
+                try:
+                    from pydux.devtools.state_snapshot import restore_store_state
+                    restore_store_state(store, snapshot)
+                except Exception:
+                    import logging
+                    logging.getLogger("qyro.development").exception(
+                        "Development store recovery failed"
+                    )
             import logging
             logging.getLogger("qyro.development").warning("Source refresh rejected: %s", exc)
 
