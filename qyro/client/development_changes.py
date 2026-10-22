@@ -17,6 +17,7 @@ class DevelopmentChangeReceiver:
         self._connection = None
         self._thread = None
         self._last_revision = 0
+        self._send_lock = threading.Lock()
 
     def start(self):
         if self._thread is not None:
@@ -79,6 +80,26 @@ class DevelopmentChangeReceiver:
                     self.on_change(tuple(paths))
                 except (ValueError, TypeError, AttributeError):
                     continue
+
+    def request_restart(self, reason):
+        """Ask the authenticated parent to replace this process generation."""
+        if reason not in {
+            "loaded_native_extension_changed",
+            "runtime_bootstrap_changed",
+            "backend_changed",
+        }:
+            raise ValueError("Unsupported process restart reason.")
+        message = json.dumps({
+            "version": 1, "kind": "restart_request", "reason": reason,
+        }, separators=(",", ":")) + "\n"
+        with self._send_lock:
+            if self._stop.is_set() or self._connection is None:
+                return False
+            try:
+                self._connection.sendall(message.encode("utf-8"))
+                return True
+            except OSError:
+                return False
 
     def stop(self):
         self._stop.set()
