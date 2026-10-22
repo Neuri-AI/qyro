@@ -25,6 +25,7 @@ class VeltoContext:
     _global_container: ClassVar[Optional[EngineContainer]] = None
     _global_boot_info: ClassVar[Optional[dict[str, Any]]] = None
     _DEFAULT_WINDOW_SIZE = (800, 600)
+    stylesheets: ClassVar[tuple[str, ...]] = ()
 
     def __init__(
         self,
@@ -150,7 +151,31 @@ class VeltoContext:
         compiled_render = compile_component(render_method)
 
         def root() -> Any:
-            return compiled_render(self)
+            # Keep source binding active whenever the component re-evaluates.
+            from psx.css.context import scoped_css_resources
+
+            configured = self.app_settings.get("css", {})
+            if configured is None:
+                configured = {}
+            if not isinstance(configured, Mapping):
+                raise TypeError("css settings must be an object.")
+            settings_sheets = configured.get("stylesheets", ())
+            class_sheets = getattr(self, "stylesheets", ())
+            for sheets in (settings_sheets, class_sheets):
+                if not isinstance(sheets, (list, tuple)) or not all(
+                    isinstance(item, str) for item in sheets
+                ):
+                    raise TypeError("CSS stylesheets must be resource path sequences.")
+
+            def read_resource(path: str) -> bytes:
+                # Release Qyro extracts ordinary protected assets before
+                # public get_resource returns their filesystem path.
+                return Path(self.get_resource(path)).read_bytes()
+
+            with scoped_css_resources(
+                (*settings_sheets, *class_sheets), resolver=read_resource,
+            ):
+                return compiled_render(self)
 
         root.__name__ = f"{type(self).__name__}Root"
         root.__qualname__ = root.__name__
