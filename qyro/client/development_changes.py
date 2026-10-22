@@ -16,7 +16,7 @@ class DevelopmentChangeReceiver:
         self._stop = threading.Event()
         self._connection = None
         self._thread = None
-        self._seen = set()
+        self._last_revision = 0
 
     def start(self):
         if self._thread is not None:
@@ -62,14 +62,17 @@ class DevelopmentChangeReceiver:
                         continue
                     request_id = message.get("request_id")
                     paths = message.get("paths")
-                    if not isinstance(request_id, str) or not request_id or request_id in self._seen:
+                    if not isinstance(request_id, str) or not request_id.isdecimal():
+                        continue
+                    revision = int(request_id)
+                    if revision <= self._last_revision:
                         continue
                     if not isinstance(paths, list) or not paths or not all(
                         isinstance(path, str) and path and not Path(path).is_absolute()
                         and ".." not in Path(path).parts for path in paths
                     ):
                         continue
-                    self._seen.add(request_id)
+                    self._last_revision = revision
                     self.on_change(tuple(paths))
                 except (ValueError, TypeError, AttributeError):
                     continue
@@ -82,4 +85,4 @@ class DevelopmentChangeReceiver:
         if self._thread is not None:
             self._thread.join(timeout=2)
             self._thread = None
-        self._seen.clear()
+        self._last_revision = 0
