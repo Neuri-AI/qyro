@@ -41,6 +41,8 @@ class VeltoContext:
         self._renderer: Any = None
         self._handle: Any = None
         self._mounted = False
+        self._development_receiver = None
+        self._development_changes = []
         self._argv = (VeltoContext._global_boot_info or {}).get("argv")
 
     @classmethod
@@ -344,7 +346,25 @@ class VeltoContext:
     def get_resource(self, *segments: str, required: bool = True) -> str:
         return str(self.container.resolve_resource_use_case.execute(*segments, required=required))
 
+    def _start_development_receiver(self) -> None:
+        """Connect only source, enabled applications to their CLI supervisor."""
+        import os
+        if (self.is_frozen or os.environ.get("VELTO_DEVELOPMENT") != "1"
+                or os.environ.get("PSX_HOT_RELOAD") == "0"):
+            return
+        settings = self.app_settings.get("hot_reload", {})
+        if not isinstance(settings, dict) or settings.get("enabled") is not True:
+            return
+        from .development_changes import DevelopmentChangeReceiver
+
+        receiver = DevelopmentChangeReceiver(self._development_changes.append)
+        receiver.start()
+        self._development_receiver = receiver
+
     def unmount(self) -> None:
+        if self._development_receiver is not None:
+            self._development_receiver.stop()
+            self._development_receiver = None
         if self._app is not None and self._mounted:
             self._app.unmount()
         self._mounted = False
@@ -352,7 +372,13 @@ class VeltoContext:
 
     def run(self) -> int:
         self.mount()
-        return self._renderer.run()
+        self._start_development_receiver()
+        try:
+            return self._renderer.run()
+        finally:
+            if self._development_receiver is not None:
+                self._development_receiver.stop()
+                self._development_receiver = None
 
 
 def _is_pydux_store(value: object) -> bool:
