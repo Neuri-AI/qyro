@@ -13,4 +13,10 @@ jobs:
           python-version: '3.12'
       - run: python -m pip install pytest cryptography
       - run: python -m pip install -e . --no-deps
-      - run: python -m pytest -q tests/test_development_settings.py tests/test_development_changes.py tests/test_development_refresh_dispatch.py tests/test_velto_context.py
+      - uses: actions/checkout@v4
+        with:
+          repository: Neuri-AI/PSX
+          ref: 7e1674a568015c814038a7dc9d1e48f5094471b8
+          path: partner-psx
+      - run: python -m pip install -e partner-psx --no-deps
+      - run: python -m pytest -q tests/test_development_settings.py tests/test_development_changes.py tests/test_development_refresh_dispatch.py tests/test_coordinated_context_refresh.py tests/test_velto_context.py
