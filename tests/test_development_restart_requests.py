@@ -50,3 +50,10 @@ def test_unloaded_binary_does_not_request_restart(tmp_path, monkeypatch):
     # The existing PSX updater rejects unrelated binaries without side effects.
     ctx._apply_development_change((binary.name,))
     ctx._development_receiver.request_restart.assert_not_called()
+
+
+def test_supported_unsafe_restart_reasons_require_connected_supervisor():
+    receiver = DevelopmentChangeReceiver(lambda _: None)
+    for reason in ("interpreter_changed", "unsafe_global_initialization",
+                   "external_resource_incompatible"):
+        assert receiver.request_restart(reason) is False
