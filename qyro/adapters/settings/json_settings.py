@@ -4,6 +4,7 @@ Implements ISettingsPort by loading base.json and platform-specific JSON setting
 """
 
 import json
+import os
 from pathlib import Path
 from typing import Any, Dict
 from qyro.application.ports.environment import IEnvironmentPort
@@ -63,6 +64,17 @@ class JsonSettingsAdapter(ISettingsPort):
                 return d
         return None
 
+    @staticmethod
+    def _merge(base: Dict[str, Any], changes: Dict[str, Any]) -> None:
+        """Merge source settings without discarding sibling profile values."""
+        if not isinstance(changes, dict):
+            raise ValueError("Settings profile must be a JSON object")
+        for name, value in changes.items():
+            if isinstance(value, dict) and isinstance(base.get(name), dict):
+                JsonSettingsAdapter._merge(base[name], value)
+            else:
+                base[name] = value
+
     def get_raw_settings(self) -> Dict[str, Any]:
         if self._cached_settings is not None:
             return self._cached_settings
@@ -76,7 +88,7 @@ class JsonSettingsAdapter(ISettingsPort):
             if base_file.exists():
                 try:
                     with open(base_file, "r", encoding="utf-8") as f:
-                        combined.update(json.load(f))
+                        self._merge(combined, json.load(f))
                 except Exception:
                     pass
 
@@ -92,10 +104,20 @@ class JsonSettingsAdapter(ISettingsPort):
                 if p_file.exists():
                     try:
                         with open(p_file, "r", encoding="utf-8") as f:
-                            combined.update(json.load(f))
+                            self._merge(combined, json.load(f))
                         break
                     except Exception:
                         pass
+
+            # Development overrides apply to source launches only. Frozen runtime
+            # never loads the profile, regardless of environment flags.
+            if not self._env.is_frozen() and os.environ.get("VELTO_DEVELOPMENT") == "1":
+                development = settings_dir / "development.json"
+                if development.is_file():
+                    data = json.loads(development.read_text(encoding="utf-8"))
+                    if not isinstance(data, dict):
+                        raise ValueError("settings/development.json must contain an object")
+                    self._merge(combined, data)
 
             self._apply_plain_secrets_override(settings_dir, combined)
 
@@ -117,7 +139,7 @@ class JsonSettingsAdapter(ISettingsPort):
             with open(secrets_file, "r", encoding="utf-8") as f:
                 data = json.load(f)
             if isinstance(data, dict):
-                combined.update(data)
+                self._merge(combined, data)
         except Exception:
             pass
 

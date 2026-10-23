@@ -6,6 +6,8 @@ native renderer and event loop.
 
 from __future__ import annotations
 
+from collections import deque
+
 from pathlib import Path
 from typing import Any, ClassVar, Mapping, Optional
 
@@ -41,6 +43,8 @@ class VeltoContext:
         self._renderer: Any = None
         self._handle: Any = None
         self._mounted = False
+        self._development_receiver = None
+        self._development_changes = deque(maxlen=128)
         self._argv = (VeltoContext._global_boot_info or {}).get("argv")
 
     @classmethod
@@ -71,7 +75,15 @@ class VeltoContext:
 
     @property
     def app_settings(self) -> dict[str, Any]:
-        return self.metadata.raw_settings
+        settings = self.metadata.raw_settings
+        # A supervised development rollback can retain the last functional
+        # backend without modifying the developer's configuration files.
+        import os
+        recovery = os.environ.get("VELTO_RECOVERY_FRAMEWORK")
+        if (recovery and not self.is_frozen
+                and os.environ.get("VELTO_DEVELOPMENT") == "1"):
+            return {**settings, "framework": recovery, "binding": recovery}
+        return settings
 
     @property
     def is_frozen(self) -> bool:
@@ -149,6 +161,8 @@ class VeltoContext:
         if render_method is VeltoContext.render:
             raise NotImplementedError("VeltoContext subclasses must implement render().")
         compiled_render = compile_component(render_method)
+        compiled = [compiled_render]
+        self._development_render = compiled
 
         def root() -> Any:
             # Keep source binding active whenever the component re-evaluates.
@@ -175,11 +189,13 @@ class VeltoContext:
             with scoped_css_resources(
                 (*settings_sheets, *class_sheets), resolver=read_resource,
             ):
-                return compiled_render(self)
+                return compiled[0](self)
 
         root.__name__ = f"{type(self).__name__}Root"
         root.__qualname__ = root.__name__
-        return component(root)
+        definition = component(root)
+        self._development_root_definition = definition
+        return definition
 
     def _pydux_store(self) -> object | None:
         """Return the sole Pydux-compatible store declared by the view module.
@@ -265,6 +281,8 @@ class VeltoContext:
         root = self._root_component()()
         store = self._pydux_store()
         if store is not None:
+            from .development_state import restore_restart_state
+            restore_restart_state(self, store)
             try:
                 from pydux import StoreProvider
             except ImportError as exc:  # pragma: no cover - packaging boundary
@@ -344,7 +362,115 @@ class VeltoContext:
     def get_resource(self, *segments: str, required: bool = True) -> str:
         return str(self.container.resolve_resource_use_case.execute(*segments, required=required))
 
+    def _start_development_receiver(self) -> None:
+        """Connect only source, enabled applications to their CLI supervisor."""
+        import os
+        if (self.is_frozen or os.environ.get("VELTO_DEVELOPMENT") != "1"
+                or os.environ.get("PSX_HOT_RELOAD") == "0"):
+            return
+        settings = self.app_settings.get("hot_reload", {})
+        if not isinstance(settings, dict) or settings.get("enabled") is not True:
+            return
+        from .development_changes import DevelopmentChangeReceiver
+
+        receiver = DevelopmentChangeReceiver(
+            self._on_development_change,
+            on_prepare_restart=self._on_development_restart_prepare,
+        )
+        receiver.start()
+        self._development_receiver = receiver
+
+    def _on_development_change(self, paths: tuple[str, ...]) -> None:
+        """Dispatch refresh to the GUI owner thread, never the IPC thread."""
+        if not self._mounted or self._renderer is None:
+            return
+        renderer = self._renderer
+        renderer.schedule_ui(lambda: self._apply_development_change(paths))
+
+    def _on_development_restart_prepare(self) -> None:
+        """Prepare a development snapshot on the native UI owner thread."""
+        if not self._mounted or self._renderer is None:
+            return
+        self._renderer.schedule_ui(self._prepare_development_restart)
+
+    def _prepare_development_restart(self) -> None:
+        from .development_state import capture_restart_state
+        capture_restart_state(self)
+        receiver = self._development_receiver
+        if receiver is not None:
+            receiver.acknowledge_restart()
+
+    def _apply_development_change(self, paths: tuple[str, ...]) -> None:
+        """Prepare compatible source edits and reevaluate the mounted root."""
+        if not self._mounted or self._app is None:
+            return
+        import os
+        from psx.devtools.coordinated_refresh import refresh_context_source
+        source = os.environ.get("PSX_SOURCE_ENTRY")
+        if not source:
+            return
+        # A changed native module already mapped into this interpreter cannot
+        # safely be reloaded. A first import is not an unsafe replacement.
+        from importlib.machinery import EXTENSION_SUFFIXES
+        import sys
+        root = Path(os.environ.get("VELTO_PROJECT_ROOT", Path(source).parent)).resolve()
+        changed = set()
+        for relative in paths:
+            candidate = (root / relative).resolve()
+            if candidate.is_relative_to(root):
+                changed.add(candidate)
+        native_changes = {path for path in changed if any(
+            path.name.endswith(suffix) for suffix in EXTENSION_SUFFIXES
+        )}
+        if native_changes:
+            loaded_native = {
+                Path(filename).resolve()
+                for module in tuple(sys.modules.values())
+                if isinstance((filename := getattr(module, "__file__", None)), str)
+                and any(filename.endswith(suffix) for suffix in EXTENSION_SUFFIXES)
+            }
+            if native_changes & loaded_native:
+                receiver = self._development_receiver
+                if receiver is not None:
+                    from .development_state import capture_restart_state
+                    capture_restart_state(self)
+                    receiver.request_restart("loaded_native_extension_changed")
+                return
+        # Snapshot only explicitly opted-in, JSON-compatible Pydux state.
+        store = None
+        snapshot = None
+        settings = self.app_settings.get("hot_reload", {})
+        if isinstance(settings, dict) and settings.get("preserve_state") is True:
+            try:
+                from pydux.devtools.state_snapshot import capture_store_state
+                store = self._pydux_store()
+                if store is not None:
+                    snapshot = capture_store_state(store)
+            except (ImportError, TypeError, ValueError):
+                store = None
+                snapshot = None
+        try:
+            refresh_context_source(self, Path(source), paths)
+        except Exception as exc:
+            # Cleanup may fail after a replacement has already committed.
+            reconciler = getattr(self._app, "reconciler", None)
+            committed = bool(getattr(reconciler, "_coordinated_remount_applied", False))
+            if store is not None and snapshot is not None and not committed:
+                try:
+                    from pydux.devtools.state_snapshot import restore_store_state
+                    restore_store_state(store, snapshot)
+                except Exception:
+                    import logging
+                    logging.getLogger("qyro.development").exception(
+                        "Development store recovery failed"
+                    )
+            import logging
+            logging.getLogger("qyro.development").warning("Source refresh rejected: %s", exc)
+
     def unmount(self) -> None:
+        if self._development_receiver is not None:
+            self._development_receiver.stop()
+            self._development_receiver = None
         if self._app is not None and self._mounted:
             self._app.unmount()
         self._mounted = False
@@ -352,7 +478,13 @@ class VeltoContext:
 
     def run(self) -> int:
         self.mount()
-        return self._renderer.run()
+        self._start_development_receiver()
+        try:
+            return self._renderer.run()
+        finally:
+            if self._development_receiver is not None:
+                self._development_receiver.stop()
+                self._development_receiver = None
 
 
 def _is_pydux_store(value: object) -> bool:
