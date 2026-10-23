@@ -57,3 +57,22 @@ def test_supported_unsafe_restart_reasons_require_connected_supervisor():
     for reason in ("interpreter_changed", "unsafe_global_initialization",
                    "external_resource_incompatible"):
         assert receiver.request_restart(reason) is False
+
+
+def test_development_backend_rollback_is_source_only(monkeypatch):
+    from qyro.domain.entities import AppMetadata
+    context = object.__new__(VeltoContext)
+    boot = VeltoContext._global_boot_info
+    try:
+        VeltoContext._global_boot_info = {
+            "is_frozen": False,
+            "metadata": AppMetadata(raw_settings={"framework": "kivy"}),
+        }
+        monkeypatch.setenv("VELTO_DEVELOPMENT", "1")
+        monkeypatch.setenv("VELTO_RECOVERY_FRAMEWORK", "tkinter")
+        assert context.app_settings["framework"] == "tkinter"
+        assert context.metadata.raw_settings["framework"] == "kivy"
+        VeltoContext._global_boot_info["is_frozen"] = True
+        assert context.app_settings["framework"] == "kivy"
+    finally:
+        VeltoContext._global_boot_info = boot
