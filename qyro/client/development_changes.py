@@ -11,8 +11,9 @@ import threading
 class DevelopmentChangeReceiver:
     """Passive, source-only child-side coordination endpoint."""
 
-    def __init__(self, on_change):
+    def __init__(self, on_change, *, on_prepare_restart=None):
         self.on_change = on_change
+        self.on_prepare_restart = on_prepare_restart
         self._stop = threading.Event()
         self._connection = None
         self._thread = None
@@ -62,7 +63,13 @@ class DevelopmentChangeReceiver:
                 data = bytearray(remainder)
                 try:
                     message = json.loads(raw)
-                    if message.get("version") != 1 or message.get("kind") != "change":
+                    if message.get("version") != 1:
+                        continue
+                    if message.get("kind") == "prepare_restart":
+                        if callable(self.on_prepare_restart):
+                            self.on_prepare_restart()
+                        continue
+                    if message.get("kind") != "change":
                         continue
                     request_id = message.get("request_id")
                     paths = message.get("paths")
@@ -80,6 +87,18 @@ class DevelopmentChangeReceiver:
                     self.on_change(tuple(paths))
                 except (ValueError, TypeError, AttributeError):
                     continue
+
+    def acknowledge_restart(self):
+        """Confirm the child completed restart preparation."""
+        payload = json.dumps({"version": 1, "kind": "restart_ready"}) + "\n"
+        with self._send_lock:
+            if self._connection is None or self._stop.is_set():
+                return False
+            try:
+                self._connection.sendall(payload.encode("utf-8"))
+                return True
+            except OSError:
+                return False
 
     def request_restart(self, reason):
         """Ask the authenticated parent to replace this process generation."""
