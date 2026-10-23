@@ -76,3 +76,54 @@ def test_development_backend_rollback_is_source_only(monkeypatch):
         assert context.app_settings["framework"] == "kivy"
     finally:
         VeltoContext._global_boot_info = boot
+
+
+def test_root_host_change_requests_restart_without_discarding_live_app(tmp_path, monkeypatch):
+    import types
+    from unittest.mock import Mock
+    import qyro.client.development_state as development_state
+
+    source = tmp_path / "main.py"
+    source.write_text("class Demo: pass", encoding="utf-8")
+    monkeypatch.setenv("PSX_SOURCE_ENTRY", str(source))
+    monkeypatch.setenv("VELTO_PROJECT_ROOT", str(tmp_path))
+
+    class RootHostTransitionRequiresRestart(Exception):
+        pass
+
+    psx = types.ModuleType("psx")
+    psx.__path__ = []
+    core = types.ModuleType("psx.core")
+    core.__path__ = []
+    errors = types.ModuleType("psx.core.errors")
+    errors.RootHostTransitionRequiresRestart = RootHostTransitionRequiresRestart
+    devtools = types.ModuleType("psx.devtools")
+    devtools.__path__ = []
+    refresh = types.ModuleType("psx.devtools.coordinated_refresh")
+    def reject_root_change(*_args):
+        raise RootHostTransitionRequiresRestart("root type changed")
+    refresh.refresh_context_source = reject_root_change
+    for name, module in (
+        ("psx", psx), ("psx.core", core), ("psx.core.errors", errors),
+        ("psx.devtools", devtools), ("psx.devtools.coordinated_refresh", refresh),
+    ):
+        monkeypatch.setitem(sys.modules, name, module)
+
+    saved = Mock(return_value=True)
+    monkeypatch.setattr(development_state, "capture_restart_state", saved)
+    monkeypatch.setattr(VeltoContext, "app_settings", property(
+        lambda _self: {"hot_reload": {"preserve_state": False}}))
+    context = object.__new__(VeltoContext)
+    context._mounted = True
+    context._app = object()
+    context._development_receiver = SimpleNamespace(
+        request_restart=Mock(return_value=True))
+    context._apply_development_change(("main.py",))
+    saved.assert_called_once_with(context)
+    context._development_receiver.request_restart.assert_called_once_with(
+        "root_host_changed")
+
+
+def test_root_host_restart_reason_requires_connected_supervisor():
+    assert DevelopmentChangeReceiver(lambda _: None).request_restart(
+        "root_host_changed") is False
