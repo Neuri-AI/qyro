@@ -273,6 +273,8 @@ class VeltoContext:
         root = self._root_component()()
         store = self._pydux_store()
         if store is not None:
+            from .development_state import restore_restart_state
+            restore_restart_state(self, store)
             try:
                 from pydux import StoreProvider
             except ImportError as exc:  # pragma: no cover - packaging boundary
@@ -363,7 +365,10 @@ class VeltoContext:
             return
         from .development_changes import DevelopmentChangeReceiver
 
-        receiver = DevelopmentChangeReceiver(self._on_development_change)
+        receiver = DevelopmentChangeReceiver(
+            self._on_development_change,
+            on_prepare_restart=self._on_development_restart_prepare,
+        )
         receiver.start()
         self._development_receiver = receiver
 
@@ -373,6 +378,19 @@ class VeltoContext:
             return
         renderer = self._renderer
         renderer.schedule_ui(lambda: self._apply_development_change(paths))
+
+    def _on_development_restart_prepare(self) -> None:
+        """Prepare a development snapshot on the native UI owner thread."""
+        if not self._mounted or self._renderer is None:
+            return
+        self._renderer.schedule_ui(self._prepare_development_restart)
+
+    def _prepare_development_restart(self) -> None:
+        from .development_state import capture_restart_state
+        capture_restart_state(self)
+        receiver = self._development_receiver
+        if receiver is not None:
+            receiver.acknowledge_restart()
 
     def _apply_development_change(self, paths: tuple[str, ...]) -> None:
         """Prepare compatible source edits and reevaluate the mounted root."""
@@ -406,6 +424,8 @@ class VeltoContext:
             if native_changes & loaded_native:
                 receiver = self._development_receiver
                 if receiver is not None:
+                    from .development_state import capture_restart_state
+                    capture_restart_state(self)
                     receiver.request_restart("loaded_native_extension_changed")
                 return
         # Snapshot only explicitly opted-in, JSON-compatible Pydux state.
