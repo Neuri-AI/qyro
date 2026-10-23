@@ -452,6 +452,21 @@ class VeltoContext:
         try:
             refresh_context_source(self, Path(source), paths)
         except Exception as exc:
+            # The native application window is owned by its root host. A
+            # change between root host types must replace the process, not
+            # discard the live window before a new root is presented.
+            try:
+                from psx.core import errors as psx_errors
+                transition_error = getattr(psx_errors, "RootHostTransitionRequiresRestart", None)
+            except ImportError:
+                transition_error = None
+            if transition_error is not None and isinstance(exc, transition_error):
+                receiver = self._development_receiver
+                if receiver is not None:
+                    from .development_state import capture_restart_state
+                    capture_restart_state(self)
+                    if receiver.request_restart("root_host_changed"):
+                        return
             # Cleanup may fail after a replacement has already committed.
             reconciler = getattr(self._app, "reconciler", None)
             committed = bool(getattr(reconciler, "_coordinated_remount_applied", False))
