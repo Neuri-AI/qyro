@@ -109,6 +109,7 @@ class DevelopmentChangeReceiver:
             "interpreter_changed",
             "unsafe_global_initialization",
             "external_resource_incompatible",
+            "root_host_changed",
         }:
             raise ValueError("Unsupported process restart reason.")
         message = json.dumps({
