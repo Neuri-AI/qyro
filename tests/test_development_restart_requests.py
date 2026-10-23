@@ -66,7 +66,7 @@ def test_development_backend_rollback_is_source_only(monkeypatch):
     try:
         VeltoContext._global_boot_info = {
             "is_frozen": False,
-            "metadata": AppMetadata(raw_settings={"framework": "kivy"}),
+            "metadata": AppMetadata(app_name="Restart recovery", raw_settings={"framework": "kivy"}),
         }
         monkeypatch.setenv("VELTO_DEVELOPMENT", "1")
         monkeypatch.setenv("VELTO_RECOVERY_FRAMEWORK", "tkinter")
