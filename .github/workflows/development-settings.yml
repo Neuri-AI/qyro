@@ -1,7 +1,9 @@
 name: Development settings validation
 on:
   push:
-    branches: [feature/coordinated-hot-reload]
+    branches: [release, feature/coordinated-hot-reload, 'fix/**']
+  pull_request:
+    branches: [release]
   workflow_dispatch:
 jobs:
   test:
