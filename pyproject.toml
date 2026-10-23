@@ -9,7 +9,7 @@ packages = [{include = "qyro"}]
 
 [tool.poetry.dependencies]
 python = ">=3.10,<3.13.20"
-cryptography = ">=45.0.0,<47.0.0"
+cryptography = ">=50.0.2,<=51.0.0"
 
 PySide6 = {version = ">=6.8", optional = true, python = "<3.14"}
 PyQt6 = {version = ">=6.8", optional = true, python = "<3.14"}
