@@ -75,7 +75,15 @@ class VeltoContext:
 
     @property
     def app_settings(self) -> dict[str, Any]:
-        return self.metadata.raw_settings
+        settings = self.metadata.raw_settings
+        # A supervised development rollback can retain the last functional
+        # backend without modifying the developer's configuration files.
+        import os
+        recovery = os.environ.get("VELTO_RECOVERY_FRAMEWORK")
+        if (recovery and not self.is_frozen
+                and os.environ.get("VELTO_DEVELOPMENT") == "1"):
+            return {**settings, "framework": recovery, "binding": recovery}
+        return settings
 
     @property
     def is_frozen(self) -> bool:
