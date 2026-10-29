@@ -451,10 +451,17 @@ class VeltoContext:
                 snapshot = None
         try:
             from .development_pydux import prepare_pydux_refresh
-            refresh_context_source(
-                self, Path(source), paths,
-                prepare_state=lambda candidate: prepare_pydux_refresh(self, candidate),
-            )
+            import inspect
+            parameters = inspect.signature(refresh_context_source).parameters
+            if "prepare_state" in parameters:
+                refresh_context_source(
+                    self, Path(source), paths,
+                    prepare_state=lambda candidate: prepare_pydux_refresh(self, candidate),
+                )
+            else:
+                # Older PSX versions can still refresh UI-only code. Newer PSX
+                # exposes the callback necessary for coordinated state changes.
+                refresh_context_source(self, Path(source), paths)
         except Exception as exc:
             # The native application window is owned by its root host. A
             # change between root host types must replace the process, not
