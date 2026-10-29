@@ -3,8 +3,6 @@ from types import SimpleNamespace
 import sys
 import types
 
-import pytest
-
 from qyro.client.development_pydux import prepare_pydux_refresh
 
 
@@ -28,7 +26,6 @@ def test_qyro_refresh_preserves_live_store_and_can_rollback(monkeypatch):
     live = Store({"user": {"name": "edited"}}, {"user": "previous"})
     transient = Store({"user": {"name": "initial", "email": "new"}}, {"user": "updated"})
     namespace = {"store": transient}
-    render = types.FunctionType(compile("pass", "<fixture>", "exec").co_consts[0], namespace) if False else None
 
     def render_candidate():
         return store
