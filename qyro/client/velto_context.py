@@ -450,7 +450,11 @@ class VeltoContext:
                 store = None
                 snapshot = None
         try:
-            refresh_context_source(self, Path(source), paths)
+            from .development_pydux import prepare_pydux_refresh
+            refresh_context_source(
+                self, Path(source), paths,
+                prepare_state=lambda candidate: prepare_pydux_refresh(self, candidate),
+            )
         except Exception as exc:
             # The native application window is owned by its root host. A
             # change between root host types must replace the process, not
