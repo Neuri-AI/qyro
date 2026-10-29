@@ -1,0 +1,30 @@
+name: Coordinated Pydux hot reload
+on:
+  push:
+    branches: [feature/coordinated-hot-reload]
+  pull_request:
+jobs:
+  pydux-coordination:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/checkout@v4
+        with:
+          repository: Neuri-AI/PSX
+          ref: fixes/psx-issues
+          path: partner-psx
+      - uses: actions/checkout@v4
+        with:
+          repository: Neuri-AI/Pydux
+          ref: fixes/inspector-state-hot-reload
+          path: partner-pydux
+      - run: python -m pip install -e . pytest
+      - run: python -m pip install -e ./partner-psx -e ./partner-pydux
+      - run: python -m pytest -q tests/test_development_pydux.py tests/test_pydux_partner_refresh.py tests/test_coordinated_context_refresh.py
