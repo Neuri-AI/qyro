@@ -7,6 +7,11 @@ from psx.devtools.qyro_reload import _load_updated_class
 from qyro.client.development_pydux import prepare_pydux_refresh
 
 
+class Demo:
+    def render(self):
+        return None
+
+
 def test_new_pydux_slice_schema_reconciles_through_qyro(tmp_path: Path):
     original = create_slice(
         name="user",
@@ -15,10 +20,6 @@ def test_new_pydux_slice_schema_reconciles_through_qyro(tmp_path: Path):
     )
     live = configure_store({"user": original}, devtools=False)
     live.dispatch(original.actions.rename("edited"))
-
-    class Demo:
-        def render(self):
-            return None
 
     source = tmp_path / "main.py"
     source.write_text(
