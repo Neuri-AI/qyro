@@ -1,2 +1,0 @@
-Hola desde un recurso Qyro con Kivy.
-La ruta se resuelve igual en source y en una aplicación frozen.

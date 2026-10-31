@@ -1,2 +1,0 @@
-Hola desde un recurso de Qyro.
-La misma consulta funciona desde el código fuente y desde un bundle frozen.
