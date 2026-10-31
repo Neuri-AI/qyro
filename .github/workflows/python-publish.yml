@@ -12,29 +12,28 @@ permissions:
 
 jobs:
   release-build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.10"
 
-      - name: Install Poetry (Force v2.x Core)
+      - name: Install Poetry
         run: |
-          curl -sSL https://install.python-poetry.org | POETRY_VERSION=2.0.1 python3 -
+          curl -sSL https://install.python-poetry.org | POETRY_VERSION=2.4.1 python3 -
           echo "$HOME/.local/bin" >> $GITHUB_PATH
 
-      - name: Configure Poetry and Install Dependencies
-        run: |
-          poetry config virtualenvs.create true
-          poetry config virtualenvs.in-project true
-          poetry install --no-interaction --all-extras
+      # Building an sdist/wheel does not require installing the project's
+      # runtime dependencies or optional Qt/Kivy backends. The lockfile is
+      # managed and checked separately during development.
+      - name: Validate project metadata
+        run: poetry check
 
-      - name: Build release distributions (Poetry Core 2.0)
-        run: |
-          poetry build
+      - name: Build release distributions
+        run: poetry build
 
       - name: Upload distributions
         uses: actions/upload-artifact@v4
