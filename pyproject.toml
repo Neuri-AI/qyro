@@ -1,31 +1,35 @@
-[tool.poetry]
+[project]
 name = "qyro-engine"
 version = "0.1.0"
 description = "Qyro Engine is the runtime engine for the Velto ecosystem, providing the foundation for building and running Python applications across desktop and mobile platforms."
-authors = ["Qyro Team"]
+authors = [
+    { name = "runesc", email = "luisalfredoreyes98@gmail.com" }
+]
 license = "MIT"
 readme = "README.md"
-packages = [{include = "qyro"}]
-
-[tool.poetry.dependencies]
 requires-python = ">=3.10,<3.14.20"
-cryptography = ">=50.0.2,<=51.0.0"
+dependencies = [
+    "cryptography>=50.0.2,<=51.0.0"
+]
 
-PySide6 = {version = ">=6.8", optional = true, python = "<3.14"}
-PyQt6 = {version = ">=6.8", optional = true, python = "<3.14"}
-PySide2 = {version = ">=5.15,<6", optional = true, python = "<3.11"}
-PyQt5 = {version = ">=5.15", optional = true, python = "<3.14"}
-kivy = {version = ">=2.3", optional = true}
-sentry-sdk = {version = ">=1.30.0", optional = true}
+[project.optional-dependencies]
+pyside6 = ["PySide6>=6.8; python_version < '3.14'"]
+pyqt6 = ["PyQt6>=6.8; python_version < '3.14'"]
+pyside2 = ["PySide2>=5.15,<6; python_version < '3.11'"]
+pyqt5 = ["PyQt5>=5.15; python_version < '3.14'"]
+kivy = ["kivy>=2.3"]
+sentry = ["sentry-sdk>=1.30.0"]
+all = [
+    "PySide6>=6.8; python_version < '3.14'",
+    "PyQt6>=6.8; python_version < '3.14'",
+    "PySide2>=5.15,<6; python_version < '3.11'",
+    "PyQt5>=5.15; python_version < '3.14'",
+    "kivy>=2.3",
+    "sentry-sdk>=1.30.0"
+]
 
-[tool.poetry.extras]
-pyside6 = ["PySide6"]
-pyqt6 = ["PyQt6"]
-pyside2 = ["PySide2"]
-pyqt5 = ["PyQt5"]
-kivy = ["kivy"]
-sentry = ["sentry-sdk"]
-all = ["PySide6", "PyQt6", "PySide2", "PyQt5", "kivy", "sentry-sdk"]
+[tool.poetry]
+packages = [{ include = "qyro" }]
 
 [tool.poetry.group.dev.dependencies]
 pytest = ">=8.0.0"
@@ -33,13 +37,9 @@ pytest-cov = ">=4.1.0"
 cython = ">=3.0.12,<4.0.0"
 
 [tool.pytest.ini_options]
-# Example projects deliberately use the same test module names.  Import tests
-# by path so pytest does not treat them as one top-level ``test_project`` module.
 addopts = "--import-mode=importlib"
-# Ensure ``qyro`` resolves to this project's package directory when pytest is
-# launched from the monorepo root, rather than the sibling repository folder.
 pythonpath = ["."]
 
 [build-system]
-requires = ["poetry-core>=1.0.0"]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
