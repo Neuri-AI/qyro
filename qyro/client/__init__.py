@@ -1,3 +1,3 @@
-from .context import ApplicationContext
+from .velto_context import VeltoContext
 
-__all__ = ["ApplicationContext"]
+__all__ = ["VeltoContext"]

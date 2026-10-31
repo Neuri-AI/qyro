@@ -9,7 +9,6 @@ from .resources.filesystem_resources import FileSystemResourceAdapter
 from .telemetry.console_hook import ConsoleExceptionHookAdapter
 from .telemetry.sentry_hook import SentryExceptionHookAdapter
 from .platform.detector import PlatformDetector
-from .frameworks.factory import FrameworkFactory
 
 __all__ = [
     "SystemEnvironmentAdapter",
@@ -18,5 +17,4 @@ __all__ = [
     "ConsoleExceptionHookAdapter",
     "SentryExceptionHookAdapter",
     "PlatformDetector",
-    "FrameworkFactory",
 ]

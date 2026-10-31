@@ -7,7 +7,6 @@ from .ports import (
     IEnvironmentPort,
     IResourcePort,
     ISettingsPort,
-    IUIFrameworkPort,
     ITelemetryPort,
 )
 from .use_cases import (
@@ -20,7 +19,6 @@ __all__ = [
     "IEnvironmentPort",
     "IResourcePort",
     "ISettingsPort",
-    "IUIFrameworkPort",
     "ITelemetryPort",
     "ResolveResourceUseCase",
     "LoadSettingsUseCase",
