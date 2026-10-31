@@ -1,16 +1,15 @@
 [tool.poetry]
 name = "qyro-engine"
 version = "0.1.0"
-description = "Qyro Engine is the runtime engine for the Qyro ecosystem, providing the foundation for building and running Python applications across desktop and mobile platforms."
+description = "Qyro Engine is the runtime engine for the Velto ecosystem, providing the foundation for building and running Python applications across desktop and mobile platforms."
 authors = ["Qyro Team"]
 license = "MIT"
 readme = "README.md"
 packages = [{include = "qyro"}]
 
 [tool.poetry.dependencies]
-python = ">=3.10,<3.13.20"
-cryptography = ">=45.0.0,<47.0.0"
-velto = ">=0.1.0,<1.0.0"
+requires-python = ">=3.10,<3.14.20"
+cryptography = ">=50.0.2,<=51.0.0"
 
 PySide6 = {version = ">=6.8", optional = true, python = "<3.14"}
 PyQt6 = {version = ">=6.8", optional = true, python = "<3.14"}

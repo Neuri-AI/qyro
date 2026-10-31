@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+from contextlib import nullcontext
 import types
 from pathlib import Path
 from typing import Any
@@ -64,7 +65,14 @@ def reset_context(monkeypatch: pytest.MonkeyPatch) -> None:
     VeltoContext._global_container = None
     VeltoContext._global_boot_info = None
     _App.instances.clear()
-    monkeypatch.setitem(sys.modules, "psx", types.SimpleNamespace(App=_App, component=lambda fn: fn))
+    psx = types.ModuleType("psx")
+    psx.__path__ = []
+    psx.App = _App
+    psx.component = lambda fn: fn
+    monkeypatch.setitem(sys.modules, "psx", psx)
+    monkeypatch.setitem(sys.modules, "psx.css", types.ModuleType("psx.css"))
+    monkeypatch.setitem(sys.modules, "psx.css.context", types.SimpleNamespace(
+        scoped_css_resources=lambda *a, **kw: nullcontext()))
     monkeypatch.setitem(
         sys.modules,
         "psx.markup.component_compiler",
