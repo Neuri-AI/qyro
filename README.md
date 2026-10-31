@@ -2,11 +2,6 @@
   <img src="https://ik.imagekit.io/kummiktgaiq/ppg/Qyro-logo.svg?updatedAt=1755215983279" alt="Qyro Logo" width="50%">
 </p>
 
-> [!WARNING]
-> **Qyro is currently in alpha.** APIs, adapters, and behavior may change between releases.
-> Desktop workflows are the current focus. Mobile support is not yet considered stable.
-
-
 # Qyro Runtime
 
 > **Runtime engine for Python applications, providing a cross-platform foundation for desktop and mobile environments.**
@@ -20,483 +15,286 @@
 ![GitHub stars](https://img.shields.io/github/stars/runesc/qyro)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Sponsor](https://img.shields.io/badge/Sponsor-Buy%20Me%20a%20Coffee-FFDD00?logo=buymeacoffee&logoColor=000000)](https://buymeacoffee.com/neuri)
+> [!IMPORTANT]
+> **Qyro Engine v0.1.0 is a beta release.** Runtime APIs and integrations may change. Development currently focuses on desktop applications; mobile support is not yet considered stable.
 
+# Overview
 
-> [!NOTE]
-> **Need the Qyro automation and build tools?** This repository contains the **Qyro Runtime**, which provides Velto startup, settings, resource handling, and telemetry for Python GUI applications. For **project scaffolding, build automation, packaging, distribution, code signing, and release workflows**, see **[Qyro CLI](https://github.com/Neuri-AI/qyro-cli)**.
+Qyro Engine provides the infrastructure to initialize, configure, and run cross-platform Python applications. It centralizes the application lifecycle, resource resolution, and runtime services.
 
+- **Lifecycle:** initialization, mounting, execution, and resource cleanup through `VeltoContext`.
+- **Configuration:** merging general, operating-system-specific, and development-only settings.
+- **Resource management:** locating files and assets in both development environments and packaged applications.
+- **Protected resources:** reading and verifying compatible resource bundles and encrypted secrets.
+- **Development:** coordinating code updates and controlled restarts when needed.
+- **Application state:** recovering compatible state during development refreshes.
+- **Environment information:** platform detection, execution mode, and metadata.
+- **Optional telemetry:** Sentry integration.
 
-## What it is
+## Installation
 
-Qyro provides:
+**Requirements:** Python `>=3.10,<3.14.20`, plus the dependencies of the selected UI framework, where applicable. Availability varies by operating system and Python version.
 
-- `VeltoContext`, a PSX/Velto application entry point configured from `settings/base.json`.
-- Automatic settings loading, resource resolution, telemetry, and runtime environment information.
-- Runtime loading of encrypted secrets payloads (AES-256-GCM + HKDF-SHA256) embedded inside `resources.pak` when present.
+```shell
+python -m pip install qyro-engine==0.1.0
+```
 
-## What it is not
+Or with Poetry:
 
-Qyro is not the build/distribution CLI.
+```shell
+poetry add qyro-engine@0.1.0
+```
 
-- Build, bundle, signing, notarization: qyro-cli concern.
-- Web bridge APIs from legacy PPG examples: not part of qyro public API.
+Optional framework dependencies are available through package extras:
 
-## Velto renderers
+```shell
+python -m pip install "qyro-engine[pyside6]==0.1.0"
+python -m pip install "qyro-engine[pyqt6]==0.1.0"
+python -m pip install "qyro-engine[pyside2]==0.1.0"
+python -m pip install "qyro-engine[pyqt5]==0.1.0"
+python -m pip install "qyro-engine[kivy]==0.1.0"
+python -m pip install "qyro-engine[sentry]==0.1.0"
+```
 
-Velto renderers selected from `framework`:
+**Note:** Extras install optional dependencies for their respective frameworks, not a complete UI stack. Tkinter depends on your Python/Tk installation. Package availability varies by operating system and Python version.
 
-- PySide6
-- PyQt6
-- PySide2
-- PyQt5
-- Kivy
-- Tkinter
+To develop from this repository:
 
-`framework` is required (`binding` is a legacy fallback); Qyro never
-auto-detects a toolkit. It builds the corresponding Velto renderer with the
-size defined by `window.width` and `window.height`, or `800×600` when the
-window block is missing or invalid.
+```shell
+git clone https://github.com/Neuri-AI/qyro.git
+cd qyro
+python -m pip install -e ".[sentry]" pytest
+python -m pytest -q
+```
 
-## Quick start
+## Quick Start
+
+Create the following files in a project with compatible UI dependencies installed:
+
+```text
+my-app/
+├── main.py
+└── settings/
+    └── base.json
+```
+
+**`settings/base.json`**
+
+```json
+{
+  "app_name": "My Application",
+  "framework": "PySide6",
+  "window": {
+    "width": 900,
+    "height": 600
+  }
+}
+```
+
+**`main.py`**
 
 ```python
 import sys
-from qyro import VeltoContext
-from psx import component, psx
 
-@component
-def MyComponent():
-    return psx("<Text>This is a child component!</Text>")
+from qyro import VeltoContext
+from psx import psx
+
 
 class MyApp(VeltoContext):
     def render(self):
-        return psx('''
-            <Flex direction="column" align_items="center" width="100%">
-                <Text>Hello, Velto!</Text>
-                <MyComponent />
-            </Flex>
-        ''')
+        return psx("""
+            <div>
+                <h1>Hello, world!</h1>
+                <p>Running with Qyro Engine.</p>
+            </div>
+        """)
+
 
 if __name__ == "__main__":
     sys.exit(MyApp().run())
 ```
 
+Run the application using your project's supported development command (or `python main.py` if the dependencies and application environment are installed directly).
+
+Qyro uses the `framework` setting to initialize the renderer and start the application's event loop. The `framework` option must be configured explicitly. If the window dimensions are missing or invalid, Qyro defaults to `800 × 600`.
+
+> [!TIP]
+> For project generation and build tools, see [Velto CLI](https://github.com/Neuri-AI/velto-cli).
+
+## UI Frameworks
+
+The `framework` setting supports the following options when starting an application:
+
+| Value | Technology | Considerations |
+| --- | --- | --- |
+| `PySide6` | Qt 6 | Requires the corresponding dependencies |
+| `PyQt6` | Qt 6 | Requires the corresponding dependencies |
+| `PySide2` | Qt 5 | Limited wheel availability depending on Python version and platform |
+| `PyQt5` | Qt 5 | Requires the corresponding dependencies |
+| `Kivy` | Kivy | Compatibility depends on the platform and installed adapter |
+| `Tkinter` | Tk | Requires working Tk support in Python |
+
+Compatibility should be verified for each combination of operating system, Python version, and dependencies.
+
+## Configuration
+
+Qyro locates application settings in the project's standard paths and merges them into `app_settings`.
+
+```text
+my-app/
+├── main.py
+├── settings/
+│   ├── base.json              # Shared settings
+│   ├── windows.json           # Windows-specific settings
+│   ├── mac.json               # macOS-specific settings
+│   ├── linux.json             # Linux-specific settings
+│   ├── development.json       # Development-only settings
+│   ├── secrets.json           # Local secrets (do not commit to Git)
+│   └── sign.json              # CLI-only; not runtime settings
+└── resources/
+    ├── base/
+    ├── windows/
+    ├── mac/
+    └── linux/
+```
+
+Settings are merged in the following order:
+
+1. `base.json` establishes the default values.
+2. The corresponding platform profile overrides those values.
+3. `development.json` contains development-specific settings and is applied when running in the development environment. Packaged applications do not load this profile.
+4. If a local `secrets.json` file exists, its contents are merged into the settings.
+5. The protected resource runtime applies the encrypted secrets payload, if available.
+
+Standard settings profiles are merged recursively for nested objects. The final decrypted secrets payload is applied as top-level keys. The result is available through `app_settings`.
+
+```python
+# Inside a VeltoContext subclass:
+settings = self.app_settings
+app_name = settings.get("app_name", "My Application")
+```
+
+### Development Refresh Configuration
+
+Qyro supports optional coordination with the hot reload module. When enabled in the project configuration, compatible store state can be captured and restored during a refresh:
+
 ```json
 {
-  "app_name": "Example",
-  "framework": "PySide6",
-  "window": {"width": 800, "height": 600}
+  "hot_reload": {
+    "preserve_state": true
+  }
 }
 ```
 
-`ApplicationContext`, `Component`, `qyro.ui`, and Qyro-owned framework
-adapters have been removed. UI components are now exclusively Velto components.
+Development change notifications use an authenticated local endpoint provided by the supervisor. Incompatible changes—such as modifications to a loaded native extension or a transition of the application's root host—may require a full process restart. The runtime does not enable live updates for packaged applications.
 
-## Compatibility
+## Stylesheets and Resources
 
-The table below reports validation results for the complete desktop workflow:
+Qyro resolves resource paths whether the application runs from source code or a protected package.
 
-```text
-init → start → build → bundle
+```python
+from qyro import get_resource
+
+icon_path = get_resource("icons/app.png")
 ```
 
-> Table last validated: **2026-10-02**  
-> CI run: [#37052349565](https://github.com/Neuri-AI/qyro-cli/actions/runs/37052349565)
+`get_resource()` returns an absolute filesystem path. It accepts multiple path segments and the `required=False` argument when a missing resource should not raise an error.
 
-| Framework | Platform | Python 3.10 | Python 3.11 | Python 3.12 | Python 3.13 | Python 3.14 | Notes |
-| --------- | -------- | ----------- | ----------- | ----------- | ----------- | ----------- | ----- |
-| PySide6 | Windows | ✅ | ✅ | ✅ | ✅ | ✅ | Full pass |
-| PySide6 | macOS | ✅ | ✅ | ✅ | ✅ | ✅ | Full pass |
-| PySide6 | Linux | ✅ | ✅ | ✅ | ✅ | ✅ | Full pass |
-| PySide2 | Linux | — | — | — | — | — | No CI coverage |
-| PySide2 | Windows | — | — | — | — | — | No CI coverage |
-| PySide2 | macOS | — | — | — | — | — | No CI coverage |
-| PyQt6 | Windows | ✅ | ✅ | ✅ | ✅ | ✅ | Full pass |
-| PyQt6 | macOS | ✅ | ✅ | ✅ | ✅ | ✅ | Full pass |
-| PyQt6 | Linux | ✅ | ✅ | ✅ | ✅ | ✅ | Full pass |
-| PyQt5 | Windows | ✅ | ✅ | ✅ | ✅ | ✅ | Full pass |
-| PyQt5 | macOS | ✅ | ✅ | ✅ | ✅ | ✅ | Full pass |
-| PyQt5 | Linux | ✅ | ✅ | ✅ | ✅ | ✅ | Full pass |
-| Kivy | Windows | ✅ | ✅ | ✅ | ✅ | ❌ | Python 3.14 failed at `install` |
-| Kivy | macOS | ✅ | ✅ | ✅ | ✅ | ✅ | Full pass |
-| Kivy | Linux | ✅ | ✅ | ✅ | ✅ | ✅ | Full pass |
-| Tkinter | Windows | ✅ | ✅ | ✅ | ✅ | ✅ | Full pass |
-| Tkinter | macOS | ✅ | ✅ | ✅ | ✅ | ✅ | Full pass |
-| Tkinter | Linux | ✅ | ✅ | ✅ | ✅ | ✅ | Full pass |
+The application's main context also supports configuring stylesheets for Velto/PSX:
 
-Legend:
-
-- ✅ `FULL PASS`: all four workflow stages completed.
-- ❌ `FAIL`: validation was attempted and failed.
-- — `NOT TESTED`: no validation result is available.
-
-Known failure:
-
-- **Kivy · Python 3.14 · Windows:** failed during `install`.
-
-Compatibility results are specific to the operating system, Python version,
-framework, dependency state, and CI environment used during testing.
-
-
-## Installation
-
-The distribution name declared by this repository is `qyro-engine`; the Python
-package imported by applications is `qyro`. The project is configured with
-Poetry extras. From a repository checkout:
-
-Install Poetry in an isolated environment with pipx, then verify it:
-
-```bash
-pipx install poetry
-poetry --version
+```json
+{
+  "css": {
+    "stylesheets": ["css/styles.css"]
+  }
+}
 ```
 
-See the [official Poetry installation guide](https://python-poetry.org/docs/)
-for its macOS, Linux, WSL, and Windows installers.
+Alternatively, `VeltoContext` subclasses can define a `stylesheets` tuple containing resource paths. Qyro prepares these resources for use during application rendering.
 
-Base package:
+## Protected Resources and Secrets
 
-```bash
-poetry install
-
-```
-
-With specific GUI stack:
-
-```bash
-poetry install -E pyside6
-poetry install -E pyqt6
-poetry install -E pyside2
-poetry install -E pyqt5
-poetry install -E kivy
-
-```
-
-With telemetry helper:
-
-```bash
-poetry install -E sentry
-
-```
-
-Everything enabled:
-
-```bash
-poetry install --all-extras
-
-```
-
-## Expected project layout
-
-Qyro looks for settings and resources in common locations.
-Resources are resolved from OS-specific folders first, then base folders.
-Typical layout:
+Qyro supports compatible protected resource bundles. Protected runtime files are stored under **`.velto/`**:
 
 ```text
 my-app/
-├─ main.py
-├─ settings/
-│  ├─ base.json
-│  ├─ windows.json
-│  ├─ mac.json
-│  ├─ linux.json
-│  ├─ sign.json          # CLI-only signing/notarization; never bundled
-│  └─ secrets.json       # API keys, tokens, and protected app data
-└─ resources/
-   ├─ base/
-   ├─ windows/
-   ├─ mac/
-   └─ linux/
-
+└── .velto/
+    ├── resources.pak
+    └── runtime*.so / runtime*.pyd
 ```
 
-During a frozen build, Qyro CLI excludes the plaintext `secrets.json`, encrypts
-the complete object, and packages it for the Engine to load at runtime:
+Qyro Engine supports encrypting application secrets with AES-256-GCM, using HKDF-SHA256 for key derivation.
 
-```text
-my-app/
-└─ .qyro/
-    ├─ resources.pak
-    ├─ runtime*.so|runtime*.pyd
+At runtime, Qyro locates the protected bundle, verifies its integrity, extracts the relevant `settings/` and `resources/` entries to a temporary runtime location, and makes resources accessible through the standard API. The runtime extension provides the protected cryptographic key material.
 
-```
+> [!WARNING]
+> Protected resources and locally encrypted secrets reduce accidental exposure of stored data, but **do not guarantee confidentiality** against someone who controls the distributed application or its runtime memory. Do not include privileged server-side credentials in a client application.
 
-`sign.json` is a separate local-only Qyro CLI profile. The Engine does not load
-it, and Qyro CLI excludes it from ordinary and protected build resources.
+## Runtime API
 
-Application code reads the resulting API keys, tokens, and protected values
-through `app_settings` in both source and frozen modes. Encryption protects
-embedded secrets at rest, but values necessarily become available in process
-memory when the application uses them.
+The public `qyro` module currently exports:
 
-## Qyro Settings Builder
+| Symbol | Description |
+| --- | --- |
+| `VeltoContext` | Base class for the application context |
+| `EngineContainer` | Runtime dependency container |
+| `PlatformDetector`, `PlatformType` | Platform detection and identifiers |
+| `ExecutionMode` | Source or packaged application execution mode |
+| `AppMetadata` | Application metadata and original settings |
+| `get_resource(*segments, required=True)` | Resolves an application resource to an absolute path |
+| `load_build_settings()` | Loads runtime settings into a dictionary |
+| `is_frozen()` | Checks whether the application is packaged |
+| `QyroEngineError` | Base engine exception |
+| `ResourceNotFoundError` | Resource lookup error |
+| `SettingsNotFoundError` | Settings lookup error |
+| `FrameworkNotAvailableError` | Invalid or unavailable renderer |
 
-Configuring application settings and release options manually can be
-time-consuming and error-prone. The **Qyro Settings Builder** provides a
-visual interface for creating and managing the settings used by Qyro
-projects.
-
-It helps configure:
-
-- Application settings.
-- Platform-specific settings.
-- Resource-related options.
-- Release and packaging settings.
-- Distribution metadata.
-
-Use the online builder here:
-
-[Open Qyro Settings Builder](https://qyro-settings-builder.up.railway.app/)
-
-The generated configuration files can be placed in the project's `settings/`
-directory and reviewed or customized before running Qyro CLI commands.
-> [!NOTE]
-> The Settings Builder is an auxiliary tool for preparing configuration files.
-> The final settings remain part of your project and should be reviewed before
-> building or releasing an application.
-
-## Quick start (Qt)
+### `VeltoContext`
 
 ```python
-import sys
-from PySide6.QtWidgets import QMainWindow, QLabel
-from qyro import ApplicationContext
-from qyro.ui.component import Component
-
-
-class MyWindow(QMainWindow, Component, ApplicationContext):
-    def component_will_mount(self):
-        self.resize(640, 480)
-
-    def render(self):
-        label = QLabel(
-            f"App: {self.window_title}\n"
-            f"Platform: {self.platform.value}\n"
-            f"Frozen: {self.is_frozen}",
-            parent=self,
-        )
-        label.move(24, 24)
-
-
-if __name__ == "__main__":
-    window = MyWindow()
-    window.show()
-    sys.exit(window.run())
-
-```
-
-## Quick start (Kivy)
-
-```python
-from kivy.app import App
-from kivy.uix.label import Label
-from kivy.core.window import Window
-from qyro import ApplicationContext
-from qyro.ui.component import Component
-
-
-class MyKvApp(App, Component, ApplicationContext):
-
-    def component_will_mount(self):
-        Window.size = (640, 480)
-
-    def render(self):
-        label = Label(
-            text=(
-                f"Hello, World!\n\n"
-                f"App Title: {self.window_title}\n"
-                f"Platform: {self.platform.value} (Frozen: {self.is_frozen})\n\n"
-            ),
-            halign="left",
-            valign="middle",
-        )
-        label.bind(size=label.setter("text_size"))
-        return label
-
-    def build(self):
-        return self.render()
-
-if __name__ == "__main__":
-    MyKvApp().run()
-
-```
-
-## Quick start (Tkinter)
-
-```python
-import tkinter as tk
-from qyro import ApplicationContext
-from qyro.ui.component import Component
-
-
-class MyTkApp(tk.Tk, Component, ApplicationContext):
-    def component_will_mount(self):
-        self.geometry("480x240")
-
-    def render(self):
-        tk.Label(
-            self,
-            text=f"{self.window_title} | {self.platform.value} | frozen={self.is_frozen}",
-        ).pack(padx=16, pady=16)
-
-
-if __name__ == "__main__":
-    app = MyTkApp()
-    app.run()
-
-```
-
-## API Reference
-
-This section documents the public runtime API that is available in the current codebase.
-
-### Top-level API (`qyro`)
-
-Exports:
-
-* ApplicationContext
-* Component
-* EngineContainer
-* PlatformDetector
-* PlatformType
-* ExecutionMode
-* AppMetadata
-* QyroEngineError
-* ResourceNotFoundError
-* SettingsNotFoundError
-* FrameworkNotAvailableError
-* get_resource
-* load_build_settings
-* is_frozen
-
-Function signatures:
-
-```python
-def get_resource(*segments: str, required: bool = True) -> str
-def load_build_settings() -> dict
-def is_frozen() -> bool
-
-```
-
-Behavior notes:
-
-* get_resource returns an absolute path string.
-* If required=True and a resource is not found, the resolver may raise a runtime error.
-
-### ApplicationContext
-
-Constructor:
-
-```python
-ApplicationContext(
-    framework: str | None = None,
+VeltoContext(
+    *,
     custom_root: Path | None = None,
     enable_sentry: bool = True,
     argv: list[str] | None = None,
-    *args,
-    **kwargs,
 )
-
 ```
 
-Parameter reference:
+| Property | Purpose |
+| --- | --- |
+| `app_settings` | Merged runtime settings |
+| `metadata` | Application metadata |
+| `platform` | Current operating system enum |
+| `execution_mode` | Source or packaged execution mode |
+| `is_frozen` | Whether the application is running as a packaged application |
+| `container` | Engine dependency container |
+| `app` | Mounted application, or `None` before mounting |
+| `renderer` | Active renderer, or `None` before mounting |
+| `handle` | Native root handle, or `None` before mounting |
 
-| Parameter | Type | Default | Description |
-|---|---|---|---|
-| `framework` | `str \| None` | `None` | Forces a specific framework adapter. |
-| `custom_root` | `Path \| None` | `None` | Overrides the project root directory. |
-| `enable_sentry` | `bool` | `True` | Enables the Sentry hook when a DSN is available. |
-| `argv` | `list[str] \| None` | `None` | Optional arguments passed when creating the application. |
+A subclass implements `render()` and calls `run()` to start the configured runtime. `VeltoContext` also supports `unmount()` for runtime cleanup. The `app` property represents the mounted application and is not necessarily a native instance of the UI framework.
 
-Property reference:
+### Package Names
 
-| Property | Type | Description |
-|---|---|---|
-| `container` | `EngineContainer` | The underlying dependency container instance. |
-| `app` | `Any` | The native framework application instance, such as `QApplication`, a Tk root, or a Kivy app. |
-| `metadata` | `AppMetadata` | Application metadata loaded from the settings. |
-| `app_settings` | `dict[str, Any]` | The final merged settings dictionary. |
-| `is_frozen` | `bool` | Indicates whether the application is running from a frozen bundle. |
-| `platform` | `PlatformType` | The detected platform enum value. |
-| `execution_mode` | `ExecutionMode` | The current execution mode: source or frozen. |
-| `window_title` | `str` | The current window title, with getter and setter support. |
-| `app_icon` | `str \| None` | The resolved application icon path, with setter support. |
+| Purpose | Name |
+| --- | --- |
+| Distribution | `qyro-engine` |
+| Import | `qyro` |
+| Application context | `from qyro import VeltoContext` |
 
-Method reference:
+## Compatibility
 
-| Method | Signature | Returns | Notes |
-|---|---|---|---|
-| `get_default_window_title` | `get_default_window_title()` | `str` | Uses the metadata-to-`app_name` fallback chain. |
-| `get_window_title` | `get_window_title()` | `str` | Reads the current title from the native window when possible. |
-| `set_window_title` | `set_window_title(title, window=None)` | `bool` | Best-effort cross-toolkit title assignment. |
-| `get_app_icon_path` | `get_app_icon_path()` | `str \| None` | Automatically discovers the icon from settings and resource conventions. |
-| `set_window_icon` | `set_window_icon(icon_path_or_relative, window=None)` | `bool` | Accepts an absolute path or a relative resource path. |
-| `get_resource` | `get_resource(*segments, required=True)` | `str` | Resolves a resource to an absolute path string. |
-| `run` | `run()` | `int` | Starts the event loop through the active framework adapter. |
+Qyro Engine is designed for cross-platform application development on **Windows, macOS, Linux, Android, and iOS**.
 
-### Component (`qyro.ui.component`)
+Compatibility depends on the Python version, operating system, selected UI framework, and its dependencies.
 
-Component is a lifecycle mixin designed for UI classes supporting multi-toolkit frameworks.
+## Qyro Settings Builder
 
-#### Instantiation & Props
-
-Components can receive properties (`props`) in two ways upon instantiation:
-
-1. Via an explicit dictionary: `MyComponent(parent=self, props={"title": "Hello"})`
-2. Via direct keyword arguments: `MyComponent(parent=self, title="Hello")` (automatically isolating toolkit-specific arguments like `parent`).
-
-Lifecycle hook order:
-
-1. `component_will_mount`
-2. `render`
-3. `component_did_mount`
-4. `set_styles`
-5. `on_resize`
-
-Primary hooks:
-
-| Hook | Signature | Purpose |
-|---|---|---|
-| `component_will_mount` | `component_will_mount()` | Performs initialization before rendering. |
-| `render` | `render()` | Builds the component's widgets and layouts. |
-| `component_did_mount` | `component_did_mount()` | Performs setup after rendering. |
-| `set_styles` | `set_styles(path_or_styles=None)` | Applies a stylesheet from a file path or an inline style definition. |
-| `on_resize` | `on_resize()` | Handles responsive behavior when the component is mounted or resized. |
-
-
-Utility methods:
-
-| Method | Signature | Description |
-| --- | --- | --- |
-| `calc` | `calc(a, b)` | Returns a percentage-based integer value. |
-| `find` | `find(target_type, name="")` | Delegates to the native `findChild` when available. |
-| `destroy_component` | `destroy_component()` | Detaches and schedules widget cleanup safely. |
-| `get_resource` | `get_resource(*segments, required=True)` | Top-level resource resolver shortcut. |
-
-
-
-* Automatic icon/title assignment is best-effort and depends on toolkit capabilities and available files.
-
-## Repository pointers
-
-* Public entrypoint: qyro/**init**.py
-* Application context facade: qyro/client/context.py
-* Component lifecycle mixin: qyro/client/component.py
-* Framework adapters: qyro/adapters/frameworks/
-* Resource resolver: qyro/adapters/resources/filesystem_resources.py
-* Settings loader: qyro/adapters/settings/json_settings.py
-
-## Full documentation
-
-The complete bilingual documentation lives in [`docs/`](docs/). It covers
-installation, project layout, application and component lifecycles, settings
-precedence, resource lookup, every framework adapter, telemetry, protected
-resources and secrets, internal architecture, the full API, troubleshooting,
-and contributor workflows.
+[Velto Settings Builder](https://velto-settings-builder.up.railway.app/) is an auxiliary visual tool for preparing application and release configuration.
 
 ## 🤝 Contributing
 
-Contributions to `qyro` and the Qyro ecosystem are welcome.
+Contributions to `qyro` are welcome.
 
 1. Fork the repository on GitHub.
 2. Create your feature branch (`git checkout -b feature/amazing-feature`).
@@ -509,12 +307,6 @@ Contributions to `qyro` and the Qyro ecosystem are welcome.
 
 ## 📄 License
 
-MIT. See [LICENSE](LICENSE).
+Distributed under the [MIT License](LICENSE).
 
----
-
-## 👥 Organization & Maintainers
-
-- **Organization:** [Neuri](https://github.com/Neuri-AI)
-- **Lead Maintainer:** Luis Alfredo De Los Reyes ([luisalfredoreyes98@gmail.com](mailto:luisalfredoreyes98@gmail.com))
-- **Ecosystem:** [Qyro](https://github.com/Neuri-AI/qyro) • [Qyro CLI](https://github.com/Neuri-AI/qyro-cli) • [Boilerplates](https://github.com/Neuri-AI)
+Maintained by [Neuri-AI](https://github.com/Neuri-AI). Project maintainer: [@runesc](https://github.com/runesc).
