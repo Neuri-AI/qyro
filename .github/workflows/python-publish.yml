@@ -42,7 +42,7 @@ jobs:
           path: dist/
 
   pypi-publish:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs:
       - release-build
     permissions:
@@ -52,7 +52,7 @@ jobs:
     # Dedicated environments with protections for publishing are strongly recommended.
     environment:
       name: pypi
-      url: https://pypi.org{{ github.event.release.name }}
+      url: https://pypi.org/project/qyro-engine/
 
     steps:
       - name: Retrieve release distributions
