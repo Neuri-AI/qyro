@@ -1,6 +1,6 @@
 [project]
 name = "qyro-engine"
-version = "0.1.0"
+version = "0.1.1"
 description = "Qyro Engine is the runtime engine for the Velto ecosystem, providing the foundation for building and running Python applications across desktop and mobile platforms."
 authors = [
     { name = "runesc", email = "luisalfredoreyes98@gmail.com" }
