@@ -227,6 +227,25 @@ class VeltoContext:
                 binding,
                 "Velto supports PySide6, PySide2, PyQt6, PyQt5, Kivy, and Tkinter.",
             )
+        # Configure the SDL window *before* Kivy's Window provider is first
+        # imported. A post-mount resize is unsafe on high-DPI Cocoa surfaces.
+        # Do not save this to the user's global Kivy configuration.
+        if binding == "kivy":
+            # The requested base.json dimensions are OS window points, not
+            # Retina drawable pixels. An oversized Cocoa window can become
+            # unreachable (only a Dock icon is shown). Fit the initial
+            # native window to the main display before SDL creates it.
+            from .kivy_window_geometry import visible_kivy_window_size
+            width, height = visible_kivy_window_size((width, height))
+            try:
+                from kivy.config import Config
+            except ImportError as exc:
+                raise FrameworkNotAvailableError(
+                    "kivy", "Install the matching Velto extra: velto[kivy]."
+                ) from exc
+            Config.set("graphics", "width", str(width))
+            Config.set("graphics", "height", str(height))
+            Config.set("graphics", "position", "auto")
         try:
             from psx.sfle.model import AvailableSize, LayoutConstraints
         except ImportError as exc:  # pragma: no cover - packaging boundary
@@ -251,7 +270,17 @@ class VeltoContext:
                 return PyQt5Renderer(argv=self._argv, sfle_constraints=constraints)
             if binding == "kivy":
                 from kivy.core.window import Window
-                Window.size = (width, height)
+                # Do not write Window.system_size after importing this
+                # provider: _size changes can recreate the SDL/GL surface
+                # before the event loop and strand an oversize Cocoa window.
+                # Config already requested a display-safe native size.
+                # Keep Cinnamon aligned with the ACTUAL drawable size.
+                drawable_width, drawable_height = Window.size
+                if drawable_width > 0 and drawable_height > 0:
+                    constraints = LayoutConstraints(
+                        width=AvailableSize(drawable_width, definite=True),
+                        height=AvailableSize(drawable_height, definite=True),
+                    )
                 from psx.renderers.kivy import KivyRenderer
                 return KivyRenderer(sfle_constraints=constraints)
             if binding == "tkinter":
@@ -320,7 +349,8 @@ class VeltoContext:
                 self._apply_tk_icon(root, icon)
         elif binding == "kivy":
             from kivy.core.window import Window
-            Window.size = (width, height)
+            # _create_renderer already configured the native window. Never
+            # resize it again after PSX has mounted its widget tree.
             Window.title = title
             if icon:
                 Window.icon = icon
