@@ -271,6 +271,11 @@ def test_kivy_retina_window_size_is_configured_once_before_psx_mount(
     drawable: tuple[int, int],
 ) -> None:
     """Window points, Retina drawables, and SFLE viewport stay distinct."""
+    # The source-level lifecycle test is independent of the CI host's screen.
+    from qyro.client import kivy_window_geometry
+    monkeypatch.setattr(
+        kivy_window_geometry, "visible_kivy_window_size", lambda size: size,
+    )
     events: list[tuple[object, ...]] = []
     bind_context({"framework": "Kivy"})
     context = _Example()
@@ -344,10 +349,10 @@ def test_kivy_retina_window_size_is_configured_once_before_psx_mount(
     assert events == [
         ("config", "graphics", "width", str(requested[0])),
         ("config", "graphics", "height", str(requested[1])),
-        ("system_size", requested),
+        ("config", "graphics", "position", "auto"),
         ("renderer",),
     ]
-    assert window.system_size == requested
+    assert window.system_size == (1920, 1080)
     assert window.size == drawable
     assert renderer.sfle_constraints.width.value == drawable[0]
     assert renderer.sfle_constraints.height.value == drawable[1]
@@ -357,6 +362,4 @@ def test_kivy_retina_window_size_is_configured_once_before_psx_mount(
     context._present("kivy", *requested)
     assert window.title == "Velto Test"
     assert window.size == drawable
-    assert [entry for entry in events if entry[0] == "system_size"] == [
-        ("system_size", requested)
-    ]
+    assert not any(entry[0] == "system_size" for entry in events)
