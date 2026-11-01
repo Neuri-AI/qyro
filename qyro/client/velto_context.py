@@ -231,7 +231,12 @@ class VeltoContext:
         # imported. A post-mount resize is unsafe on high-DPI Cocoa surfaces.
         # Do not save this to the user's global Kivy configuration.
         if binding == "kivy":
-            from kivy.config import Config
+            try:
+                from kivy.config import Config
+            except ImportError as exc:
+                raise FrameworkNotAvailableError(
+                    "kivy", "Install the matching Velto extra: velto[kivy]."
+                ) from exc
             Config.set("graphics", "width", str(width))
             Config.set("graphics", "height", str(height))
         try:
