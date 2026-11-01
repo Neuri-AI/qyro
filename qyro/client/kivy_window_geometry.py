@@ -75,11 +75,18 @@ def visible_kivy_window_size(
 ) -> tuple[int, int]:
     """Fit requested *window-point* dimensions on the visible display.
 
-    If no screen bounds can be determined, preserve the preference rather
-    than silently guessing at an arbitrary Retina scale factor.
+    If the native macOS display API is unavailable, choose a known-safe
+    desktop fallback rather than creating a potentially unreachable Cocoa
+    window. Non-macOS backends retain the requested dimensions.
     """
     if available is None:
         available = macos_usable_display_size()
+        if available is None and sys.platform == "darwin":
+            _LOG.warning(
+                "macOS display bounds unavailable; limiting Kivy startup "
+                "to 800x600 points rather than risking an invisible window"
+            )
+            available = (800, 600)
     if available is None:
         return requested
     width, height = requested
