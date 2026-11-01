@@ -231,6 +231,12 @@ class VeltoContext:
         # imported. A post-mount resize is unsafe on high-DPI Cocoa surfaces.
         # Do not save this to the user's global Kivy configuration.
         if binding == "kivy":
+            # The requested base.json dimensions are OS window points, not
+            # Retina drawable pixels. An oversized Cocoa window can become
+            # unreachable (only a Dock icon is shown). Fit the initial
+            # native window to the main display before SDL creates it.
+            from .kivy_window_geometry import visible_kivy_window_size
+            width, height = visible_kivy_window_size((width, height))
             try:
                 from kivy.config import Config
             except ImportError as exc:
@@ -239,6 +245,7 @@ class VeltoContext:
                 ) from exc
             Config.set("graphics", "width", str(width))
             Config.set("graphics", "height", str(height))
+            Config.set("graphics", "position", "auto")
         try:
             from psx.sfle.model import AvailableSize, LayoutConstraints
         except ImportError as exc:  # pragma: no cover - packaging boundary
@@ -263,14 +270,11 @@ class VeltoContext:
                 return PyQt5Renderer(argv=self._argv, sfle_constraints=constraints)
             if binding == "kivy":
                 from kivy.core.window import Window
-                # base.json expresses the OS/window-coordinate size, not
-                # the Retina OpenGL drawable. The latter can be 2x larger.
-                # Write it once, before mounting PSX and its event handlers.
-                if tuple(Window.system_size) != (width, height):
-                    Window.system_size = (width, height)
-                # Cinnamon lays out children in the same coordinate space as
-                # Kivy Widget.size / Window.size, including Retina drawables.
-                # A first-frame sync in KivyRenderer handles late SDL updates.
+                # Do not write Window.system_size after importing this
+                # provider: _size changes can recreate the SDL/GL surface
+                # before the event loop and strand an oversize Cocoa window.
+                # Config already requested a display-safe native size.
+                # Keep Cinnamon aligned with the ACTUAL drawable size.
                 drawable_width, drawable_height = Window.size
                 if drawable_width > 0 and drawable_height > 0:
                     constraints = LayoutConstraints(
