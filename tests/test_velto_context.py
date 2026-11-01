@@ -313,9 +313,9 @@ def test_kivy_retina_window_size_is_configured_once_before_psx_mount(
     window_module = types.ModuleType("kivy.core.window")
     window_module.Window = window
 
-    sfle = types.ModuleType("psx.sfle")
+    sfle = types.ModuleType("psx.layout.contracts")
     sfle.__path__ = []
-    model = types.ModuleType("psx.sfle.model")
+    model = types.ModuleType("psx.layout.contracts.model")
 
     class AvailableSize:
         def __init__(self, value, definite=False):
@@ -341,8 +341,8 @@ def test_kivy_retina_window_size_is_configured_once_before_psx_mount(
     renderer_module.KivyRenderer = RendererProbe
     for name, module in (
         ("kivy", kivy), ("kivy.config", config), ("kivy.core", core),
-        ("kivy.core.window", window_module), ("psx.sfle", sfle),
-        ("psx.sfle.model", model), ("psx.renderers", renderers),
+        ("kivy.core.window", window_module), ("psx.layout.contracts", sfle),
+        ("psx.layout.contracts.model", model), ("psx.renderers", renderers),
         ("psx.renderers.kivy", renderer_module),
     ):
         monkeypatch.setitem(sys.modules, name, module)
