@@ -259,22 +259,24 @@ def test_legacy_ui_symbols_are_not_public() -> None:
 
 
 @pytest.mark.parametrize(
-    ("requested", "drawable"),
+    ("requested", "available", "drawable"),
     [
-        ((800, 600), (1600, 1200)),
-        ((1600, 1200), (3200, 2400)),
+        ((800, 600), (1648, 929), (1600, 1200)),
+        ((1600, 1200), (1648, 929), (3200, 1858)),
+        ((2560, 1600), (1648, 929), (3296, 1858)),
     ],
 )
 def test_kivy_retina_window_size_is_configured_once_before_psx_mount(
     monkeypatch: pytest.MonkeyPatch,
     requested: tuple[int, int],
+    available: tuple[int, int],
     drawable: tuple[int, int],
 ) -> None:
     """Window points, Retina drawables, and SFLE viewport stay distinct."""
-    # The source-level lifecycle test is independent of the CI host's screen.
+    # Force predictable desktop bounds independent of the CI runner's display.
     from qyro.client import kivy_window_geometry
     monkeypatch.setattr(
-        kivy_window_geometry, "visible_kivy_window_size", lambda size: size,
+        kivy_window_geometry, "macos_usable_display_size", lambda: available,
     )
     events: list[tuple[object, ...]] = []
     bind_context({"framework": "Kivy"})
@@ -346,9 +348,12 @@ def test_kivy_retina_window_size_is_configured_once_before_psx_mount(
         monkeypatch.setitem(sys.modules, name, module)
 
     renderer = context._create_renderer("kivy", *requested)
+    visible = (
+        min(requested[0], available[0]), min(requested[1], available[1]),
+    )
     assert events == [
-        ("config", "graphics", "width", str(requested[0])),
-        ("config", "graphics", "height", str(requested[1])),
+        ("config", "graphics", "width", str(visible[0])),
+        ("config", "graphics", "height", str(visible[1])),
         ("config", "graphics", "position", "auto"),
         ("renderer",),
     ]
