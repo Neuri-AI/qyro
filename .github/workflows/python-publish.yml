@@ -1,21 +1,4 @@
-# This workflow will upload a Python Package to PyPI when a release is created
-# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python#publishing-to-package-registries
-
-name: Upload Python Package
-
-on:
-  release:
-    types: [published]
-
-permissions:
-  contents: read
-
-jobs:
-  release-build:
-    runs-on: ubuntu-24.04
-
-    steps:
-      - uses: actions/checkout@v5
+          persist-credentials: false
 
       - uses: actions/setup-python@v6
         with:
@@ -24,33 +7,99 @@ jobs:
       - name: Install Poetry
         run: |
           curl -sSL https://install.python-poetry.org | POETRY_VERSION=2.4.1 python3 -
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
-      # Building an sdist/wheel does not require installing the project's
-      # runtime dependencies or optional Qt/Kivy backends. The lockfile is
-      # managed and checked separately during development. Do not run
-      # `poetry check` here: it rejects a stale lockfile before packaging.
+      # A manual run is allowed only to recover v0.1.1.
+      # This edits the CI runner's local pyproject, NOT the Git tag.
+      - name: Repair historical v0.1.1 metadata (manual recovery only)
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        env:
+          CONFIRMED: ${{ inputs.recover_v011 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$RELEASE_TAG" != "v0.1.1" || "$CONFIRMED" != "true" ]]; then
+            echo "::error::Manual publishing is permitted only for the confirmed v0.1.1 recovery."
+            exit 1
+          fi
+          poetry version 0.1.1
+
+      - name: Validate release tag matches project version
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$RELEASE_TAG" != v* || "$RELEASE_TAG" == v ]]; then
+            echo "::error::Release tag must begin with v and contain a version."
+            exit 1
+          fi
+          expected="${RELEASE_TAG#v}"
+          actual="$(poetry version --short)"
+          if [[ "$actual" != "$expected" ]]; then
+            echo "::error::Tag $RELEASE_TAG expects $expected, but pyproject.toml contains $actual."
+            echo "::error::Update pyproject.toml BEFORE creating the next release tag."
+            exit 1
+          fi
+          echo "Verified: $RELEASE_TAG == qyro-engine $actual"
+
+      # The lockfile is managed by development CI. A release wheel/sdist
+      # does not require installing Qt/Kivy or resolving optional extras.
       - name: Build release distributions
-        run: poetry build
+        run: poetry build --clean
+
+      - name: Validate wheel and sdist metadata before publication
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import email
+          import os
+          import tarfile
+          import zipfile
+          from pathlib import Path
+
+          expected = os.environ["RELEASE_TAG"][1:]
+          files = sorted(Path("dist").iterdir())
+          wheels = [p for p in files if p.name.endswith(".whl")]
+          sdists = [p for p in files if p.name.endswith(".tar.gz")]
+          assert len(files) == 2 and len(wheels) == 1 and len(sdists) == 1, files
+          assert wheels[0].name.startswith(f"qyro_engine-{expected}-"), wheels[0]
+          assert sdists[0].name == f"qyro_engine-{expected}.tar.gz", sdists[0]
+
+          with zipfile.ZipFile(wheels[0]) as z:
+              names = [name for name in z.namelist()
+                       if name.endswith(".dist-info/METADATA")]
+              assert len(names) == 1, names
+              wheel_metadata = email.message_from_bytes(z.read(names[0]))
+
+          with tarfile.open(sdists[0]) as t:
+              members = [member for member in t.getmembers()
+                         if member.name.endswith("/PKG-INFO")]
+              assert len(members) == 1, members
+              stream = t.extractfile(members[0])
+              assert stream is not None
+              sdist_metadata = email.message_from_bytes(stream.read())
+
+          for metadata in (wheel_metadata, sdist_metadata):
+              assert metadata.get("Name", "").lower().replace("_", "-") == "qyro-engine"
+              assert metadata.get("Version") == expected, metadata.get("Version")
+          print(f"Validated wheel and sdist: qyro-engine {expected}")
+          PY
 
       - name: Upload distributions
         uses: actions/upload-artifact@v4
         with:
           name: release-dists
           path: dist/
+          if-no-files-found: error
 
   pypi-publish:
     runs-on: ubuntu-24.04
-    needs:
-      - release-build
-    permissions:
-      # IMPORTANT: this permission is mandatory for trusted publishing
-      id-token: write
-
-    # Dedicated environments with protections for publishing are strongly recommended.
+    needs: release-build
     environment:
       name: pypi
       url: https://pypi.org/project/qyro-engine/
+    permissions:
+      id-token: write
 
     steps:
       - name: Retrieve release distributions
