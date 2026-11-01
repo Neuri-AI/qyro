@@ -247,7 +247,7 @@ class VeltoContext:
             Config.set("graphics", "height", str(height))
             Config.set("graphics", "position", "auto")
         try:
-            from psx.sfle.model import AvailableSize, LayoutConstraints
+            from psx.layout.contracts.model import AvailableSize, LayoutConstraints
         except ImportError as exc:  # pragma: no cover - packaging boundary
             raise FrameworkNotAvailableError("Velto", "Install qyro-engine with Velto available.") from exc
 
