@@ -256,3 +256,107 @@ def test_legacy_ui_symbols_are_not_public() -> None:
 
     assert not hasattr(qyro, "Component")
     assert not hasattr(qyro, "ApplicationContext")
+
+
+@pytest.mark.parametrize(
+    ("requested", "drawable"),
+    [
+        ((800, 600), (1600, 1200)),
+        ((1600, 1200), (3200, 2400)),
+    ],
+)
+def test_kivy_retina_window_size_is_configured_once_before_psx_mount(
+    monkeypatch: pytest.MonkeyPatch,
+    requested: tuple[int, int],
+    drawable: tuple[int, int],
+) -> None:
+    """Window points, Retina drawables, and SFLE viewport stay distinct."""
+    events: list[tuple[object, ...]] = []
+    bind_context({"framework": "Kivy"})
+    context = _Example()
+
+    kivy = types.ModuleType("kivy")
+    kivy.__path__ = []
+    core = types.ModuleType("kivy.core")
+    core.__path__ = []
+    config = types.ModuleType("kivy.config")
+    config.Config = types.SimpleNamespace(
+        set=lambda section, key, value: events.append(
+            ("config", section, key, value)
+        )
+    )
+
+    class WindowProbe:
+        size = drawable
+        title = ""
+        icon = ""
+
+        def __init__(self) -> None:
+            self.system_size = (1920, 1080)
+
+        def __setattr__(self, name: str, value: object) -> None:
+            if name == "system_size":
+                events.append(("system_size", value))
+            if name == "size":
+                raise AssertionError("Qyro must not write drawable Window.size")
+            super().__setattr__(name, value)
+
+    window = WindowProbe()
+    events.clear()
+    window_module = types.ModuleType("kivy.core.window")
+    window_module.Window = window
+
+    sfle = types.ModuleType("psx.sfle")
+    sfle.__path__ = []
+    model = types.ModuleType("psx.sfle.model")
+
+    class AvailableSize:
+        def __init__(self, value, definite=False):
+            self.value = value
+            self.definite = definite
+
+    class LayoutConstraints:
+        def __init__(self, width, height):
+            self.width = width
+            self.height = height
+
+    model.AvailableSize = AvailableSize
+    model.LayoutConstraints = LayoutConstraints
+    renderers = types.ModuleType("psx.renderers")
+    renderers.__path__ = []
+    renderer_module = types.ModuleType("psx.renderers.kivy")
+
+    class RendererProbe:
+        def __init__(self, *, sfle_constraints):
+            events.append(("renderer",))
+            self.sfle_constraints = sfle_constraints
+
+    renderer_module.KivyRenderer = RendererProbe
+    for name, module in (
+        ("kivy", kivy), ("kivy.config", config), ("kivy.core", core),
+        ("kivy.core.window", window_module), ("psx.sfle", sfle),
+        ("psx.sfle.model", model), ("psx.renderers", renderers),
+        ("psx.renderers.kivy", renderer_module),
+    ):
+        monkeypatch.setitem(sys.modules, name, module)
+
+    renderer = context._create_renderer("kivy", *requested)
+    assert events == [
+        ("config", "graphics", "width", str(requested[0])),
+        ("config", "graphics", "height", str(requested[1])),
+        ("system_size", requested),
+        ("renderer",),
+    ]
+    assert window.system_size == requested
+    assert window.size == drawable
+    assert renderer.sfle_constraints.width.value == drawable[0]
+    assert renderer.sfle_constraints.height.value == drawable[1]
+
+    # Present may set title/icon, but must never resize the live Kivy
+    # window while PSX's interactive widget tree is already mounted.
+    context._present("kivy", *requested)
+    assert window.title == "Velto Test"
+    assert window.size == drawable
+    assert [entry for entry in events if entry[0] == "system_size"] == [
+        ("system_size", requested)
+    ]
