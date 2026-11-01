@@ -28,7 +28,14 @@ def test_oversized_window_clamped_to_visible_screen_points(
         assert "exceeds usable display" in caplog.text
 
 
-def test_no_unverified_monitor_geometry_never_guesses_retina_scale(monkeypatch):
+def test_unavailable_macos_monitor_defaults_to_known_safe_window(monkeypatch):
+    monkeypatch.setattr(geometry.sys, "platform", "darwin")
+    monkeypatch.setattr(geometry, "macos_usable_display_size", lambda: None)
+    assert geometry.visible_kivy_window_size((2560, 1600)) == (800, 600)
+
+
+def test_unavailable_non_macos_monitor_preserves_requested_size(monkeypatch):
+    monkeypatch.setattr(geometry.sys, "platform", "linux")
     monkeypatch.setattr(geometry, "macos_usable_display_size", lambda: None)
     assert geometry.visible_kivy_window_size((2560, 1600)) == (2560, 1600)
 
