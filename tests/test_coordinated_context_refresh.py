@@ -18,8 +18,8 @@ def test_context_applies_authored_source_change_without_recreating_native_host(
     tmp_path, monkeypatch,
 ):
     from psx.renderers.headless import HeadlessRenderer
-    from psx.sfle.engine import PythonLayoutEngine
-    from psx.sfle.model import AvailableSize, IntrinsicSizes, LayoutConstraints
+    from psx.layout.fallback.engine import PythonLayoutEngine
+    from psx.layout.contracts.model import AvailableSize, IntrinsicSizes, LayoutConstraints
 
     source = tmp_path / "main.py"
     source.write_text(
@@ -66,8 +66,8 @@ def test_context_remounts_hook_incompatible_root_and_keeps_native_host(
     tmp_path, monkeypatch,
 ):
     from psx.renderers.headless import HeadlessRenderer
-    from psx.sfle.engine import PythonLayoutEngine
-    from psx.sfle.model import AvailableSize, IntrinsicSizes, LayoutConstraints
+    from psx.layout.fallback.engine import PythonLayoutEngine
+    from psx.layout.contracts.model import AvailableSize, IntrinsicSizes, LayoutConstraints
 
     source = tmp_path / "main.py"
     source.write_text(
