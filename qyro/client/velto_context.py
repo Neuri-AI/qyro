@@ -354,6 +354,7 @@ class VeltoContext:
             root.title(title)
             if icon:
                 self._apply_tk_icon(root, icon)
+            self._activate_tk_window(root)
         elif binding == "kivy":
             from kivy.core.window import Window
             # _create_renderer already configured the native window. Never
@@ -367,6 +368,28 @@ class VeltoContext:
                     # SDL2 does not reliably change the macOS Dock tile.
                     from .macos_dock_icon import set_macos_dock_icon
                     set_macos_dock_icon(icon)
+
+    @staticmethod
+    def _activate_tk_window(root: Any) -> None:
+        """Bring the first Tk window forward after its initial window-map.
+
+        Qt show() activates its window, but Tk's newly created toplevel may
+        remain behind the terminal that launched 'velto start'. Schedule the
+        action after the geometry/title have been committed so the macOS
+        window manager has a visible window to activate. Never make it
+        permanently topmost or re-focus on every state update.
+        """
+        def activate() -> None:
+            if not root.winfo_exists():
+                return
+            root.deiconify()
+            root.lift()
+            if __import__("sys").platform == "darwin":
+                from .macos_window_activation import activate_macos_application
+                activate_macos_application()
+            root.focus_force()
+
+        root.after_idle(activate)
 
     @staticmethod
     def _apply_tk_icon(root: Any, icon: str) -> None:
