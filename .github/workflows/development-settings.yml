@@ -18,7 +18,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: Neuri-AI/PSX
-          ref: 9b1e585a7ce612451765a2f7a27e2ddccae334fe
+          ref: fixes/psx-issues
           path: partner-psx
       - run: python -m pip install -e partner-psx --no-deps
       - uses: actions/checkout@v4
