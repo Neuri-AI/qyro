@@ -270,6 +270,13 @@ class VeltoContext:
                 return PyQt5Renderer(argv=self._argv, sfle_constraints=constraints)
             if binding == "kivy":
                 from kivy.core.window import Window
+                # SDL's window provider can be created on first import.
+                # Set the app icon before PSX mounts or shows the window.
+                icon = self.get_app_icon_path()
+                if icon:
+                    # The provider is already initialized at this point.
+                    # Apply the icon to its live SDL window.
+                    Window.set_icon(icon)
                 # Do not write Window.system_size after importing this
                 # provider: _size changes can recreate the SDL/GL surface
                 # before the event loop and strand an oversize Cocoa window.
@@ -347,42 +354,109 @@ class VeltoContext:
             root.title(title)
             if icon:
                 self._apply_tk_icon(root, icon)
+            self._activate_tk_window(root)
         elif binding == "kivy":
             from kivy.core.window import Window
             # _create_renderer already configured the native window. Never
             # resize it again after PSX has mounted its widget tree.
             Window.title = title
             if icon:
-                Window.icon = icon
+                # Assign the Kivy property and call the documented native
+                # Window API on the real SDL2 provider (not an App instance).
+                Window.set_icon(icon)
+                if self.platform is PlatformType.MACOS:
+                    # SDL2 does not reliably change the macOS Dock tile.
+                    from .macos_dock_icon import set_macos_dock_icon
+                    set_macos_dock_icon(icon)
+
+    @staticmethod
+    def _activate_tk_window(root: Any) -> None:
+        """Bring the first Tk window forward after its initial window-map.
+
+        Qt show() activates its window, but Tk's newly created toplevel may
+        remain behind the terminal that launched 'velto start'. Schedule the
+        action after the geometry/title have been committed so the macOS
+        window manager has a visible window to activate. Never make it
+        permanently topmost or re-focus on every state update.
+        """
+        def activate() -> None:
+            if not root.winfo_exists():
+                return
+            root.deiconify()
+            root.lift()
+            if __import__("sys").platform == "darwin":
+                from .macos_window_activation import activate_macos_application
+                activate_macos_application()
+            root.focus_force()
+
+        root.after_idle(activate)
 
     @staticmethod
     def _apply_tk_icon(root: Any, icon: str) -> None:
+        """Apply the icon to Tk's window without silently hiding failures.
+
+        Tk PhotoImage supports PNG on modern Tk (including macOS Aqua);
+        iconbitmap is reserved for Windows ICO files.
+        """
+        import sys
+        import warnings
+
         try:
-            if icon.lower().endswith(".ico"):
+            if sys.platform == "win32" and icon.lower().endswith(".ico"):
                 root.iconbitmap(icon)
             else:
                 import tkinter as tk
                 image = tk.PhotoImage(file=icon)
                 root.iconphoto(True, image)
+                # Tk keeps a Tcl image reference, but retain Python ownership
+                # for the full lifetime of the native window as well.
                 root._qyro_icon_photo = image
-        except Exception:
-            pass
+        except Exception as exc:
+            warnings.warn(
+                f"Could not apply Tkinter application icon {icon!r}: {exc}",
+                RuntimeWarning, stacklevel=2,
+            )
 
     def get_app_icon_path(self) -> str | None:
+        """Resolve the current platform's window icon before generic fallback.
+
+        The boilerplate contains an .ico for Windows and PNG assets for
+        macOS/Linux. Selecting base/icons/Icon.ico on macOS makes Tk iconbitmap
+        fail and leaves Kivy on its default icon.
+        """
         raw = self.app_settings
         configured = raw.get("icon") or raw.get("app_icon")
-        candidates = ([str(configured)] if configured else []) + [
-            "icons/Icon.ico", "icons/512.png", "icons/256.png", "icons/128.png",
-            "icons/64.png", "icons/32.png", "icons/app.png", "icons/icon.png",
-            "icons/app.icns", "icons/icon.icns",
-        ]
+        if self.platform is PlatformType.WINDOWS:
+            candidates = [
+                "icons/Icon.ico", "icons/64.png", "icons/32.png",
+                "icons/256.png", "icons/128.png",
+            ]
+        elif self.platform is PlatformType.MACOS:
+            candidates = [
+                "icons/256.png", "icons/128.png", "icons/512.png",
+                "icons/64.png", "icons/32.png",
+            ]
+        else:
+            candidates = [
+                "icons/256.png", "icons/128.png", "icons/64.png",
+                "icons/32.png", "icons/512.png",
+            ]
+        candidates.extend(["icons/app.png", "icons/icon.png"])
+        if self.platform is PlatformType.WINDOWS:
+            candidates.extend(["icons/app.ico", "icons/icon.ico"])
+        # Explicit configuration wins. With no configuration, never choose
+        # Windows ICO as an implicit fallback for Tk/Kivy on macOS.
+        if configured:
+            candidates.insert(0, str(configured))
         for candidate in candidates:
             absolute = Path(candidate)
-            if absolute.is_absolute() and absolute.exists():
+            if absolute.is_absolute() and absolute.is_file():
                 return str(absolute)
             parts = [part for part in candidate.replace("\\", "/").split("/") if part]
             try:
-                resource = self.container.resolve_resource_use_case.execute(*parts, required=False)
+                resource = self.container.resolve_resource_use_case.execute(
+                    *parts, required=False,
+                )
                 if resource.exists():
                     return str(resource)
             except Exception:

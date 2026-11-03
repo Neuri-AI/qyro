@@ -9,25 +9,24 @@ from qyro.domain.entities import AppMetadata
 
 class Demo(VeltoContext):
     def render(self):
-        from psx import Flex, Text, use_state
+        from psx import Text, use_state
+        from psx.core.vnode import Box
         count, _ = use_state(23)
-        return Flex(Text(f"before:{count}"))
+        return Box(Text(f"before:{count}"))
 
 
 def test_context_applies_authored_source_change_without_recreating_native_host(
     tmp_path, monkeypatch,
 ):
     from psx.renderers.headless import HeadlessRenderer
-    from psx.layout.fallback.engine import PythonLayoutEngine
-    from psx.layout.contracts.model import AvailableSize, IntrinsicSizes, LayoutConstraints
 
     source = tmp_path / "main.py"
     source.write_text(
-        "from psx import Flex, Text, use_state\n"
+        "from psx import Text, use_state\nfrom psx.core.vnode import Box\n"
         "class Demo:\n"
         "    def render(self):\n"
         "        count, _ = use_state(23)\n"
-        "        return Flex(Text(f'after:{count}'))\n",
+        "        return Box(Text(f'after:{count}'))\n",
         encoding="utf-8",
     )
     monkeypatch.setenv("PSX_SOURCE_ENTRY", str(source))
@@ -39,11 +38,9 @@ def test_context_applies_authored_source_change_without_recreating_native_host(
         "metadata": AppMetadata(app_name="Refresh test", raw_settings={"framework": "pyside6"}),
         "is_frozen": False,
     }
-    renderer = HeadlessRenderer(
-        sfle_constraints=LayoutConstraints(AvailableSize(640, True), AvailableSize(480, True)),
-        engine=PythonLayoutEngine(),
-        measure_intrinsic=lambda node: IntrinsicSizes(4, 20, 8, 12, 18, 12, 8),
-    )
+    # Box is the stable host used by Qyro. Unlike Flex, it does not demand
+    # a Cinnamon viewport or a numerical layout engine in headless tests.
+    renderer = HeadlessRenderer()
     monkeypatch.setattr(Demo, "_create_renderer", lambda *_: renderer)
     monkeypatch.setattr(Demo, "_present", lambda *_: None)
     context = None
@@ -66,17 +63,15 @@ def test_context_remounts_hook_incompatible_root_and_keeps_native_host(
     tmp_path, monkeypatch,
 ):
     from psx.renderers.headless import HeadlessRenderer
-    from psx.layout.fallback.engine import PythonLayoutEngine
-    from psx.layout.contracts.model import AvailableSize, IntrinsicSizes, LayoutConstraints
 
     source = tmp_path / "main.py"
     source.write_text(
-        "from psx import Flex, Text, use_state, use_ref\n"
+        "from psx import Text, use_state, use_ref\nfrom psx.core.vnode import Box\n"
         "class Demo:\n"
         "    def render(self):\n"
         "        count, _ = use_state(23)\n"
         "        use_ref()\n"
-        "        return Flex(Text(f'remounted:{count}'))\n",
+        "        return Box(Text(f'remounted:{count}'))\n",
         encoding="utf-8",
     )
     monkeypatch.setenv("PSX_SOURCE_ENTRY", str(source))
@@ -88,11 +83,9 @@ def test_context_remounts_hook_incompatible_root_and_keeps_native_host(
         "metadata": AppMetadata(app_name="Remount test", raw_settings={"framework": "pyside6"}),
         "is_frozen": False,
     }
-    renderer = HeadlessRenderer(
-        sfle_constraints=LayoutConstraints(AvailableSize(640, True), AvailableSize(480, True)),
-        engine=PythonLayoutEngine(),
-        measure_intrinsic=lambda node: IntrinsicSizes(4, 20, 8, 12, 18, 12, 8),
-    )
+    # Box is the stable host used by Qyro. Unlike Flex, it does not demand
+    # a Cinnamon viewport or a numerical layout engine in headless tests.
+    renderer = HeadlessRenderer()
     monkeypatch.setattr(Demo, "_create_renderer", lambda *_: renderer)
     monkeypatch.setattr(Demo, "_present", lambda *_: None)
     context = None
