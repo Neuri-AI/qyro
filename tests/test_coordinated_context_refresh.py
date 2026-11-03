@@ -9,7 +9,8 @@ from qyro.domain.entities import AppMetadata
 
 class Demo(VeltoContext):
     def render(self):
-        from psx import Text, use_state\nfrom psx.core.vnode import Box
+        from psx import Text, use_state
+        from psx.core.vnode import Box
         count, _ = use_state(23)
         return Box(Text(f"before:{count}"))
 
