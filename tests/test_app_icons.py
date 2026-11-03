@@ -94,3 +94,46 @@ def test_tk_icon_failures_are_visible(monkeypatch):
     root = types.SimpleNamespace(iconphoto=lambda *_: None)
     with pytest.warns(RuntimeWarning, match="Could not apply Tkinter application icon"):
         VeltoContext._apply_tk_icon(root, "bad.png")
+
+
+def test_kivy_macos_presentation_updates_sdl_and_dock(monkeypatch, tmp_path):
+    from qyro.client import macos_dock_icon
+
+    icon = tmp_path / "256.png"
+    icon.write_bytes(b"test")
+    events = []
+    class Window:
+        title = None
+
+        @classmethod
+        def set_icon(cls, filename):
+            events.append(("sdl_icon", filename))
+
+    window_module = types.ModuleType("kivy.core.window")
+    window_module.Window = Window
+    monkeypatch.setitem(sys.modules, "kivy", types.ModuleType("kivy"))
+    monkeypatch.setitem(sys.modules, "kivy.core", types.ModuleType("kivy.core"))
+    monkeypatch.setitem(sys.modules, "kivy.core.window", window_module)
+    monkeypatch.setattr(macos_dock_icon, "set_macos_dock_icon",
+                        lambda filename: events.append(("dock_icon", filename)) or True)
+    ctx = _Context(PlatformType.MACOS, {"icons/256.png": icon})
+    ctx.metadata = types.SimpleNamespace(app_name="Velto Test")
+    ctx._handle = object()
+    VeltoContext._present(ctx, "kivy", 800, 600)
+    assert Window.title == "Velto Test"
+    assert events == [("sdl_icon", str(icon)), ("dock_icon", str(icon))]
+
+
+def test_macos_dock_icon_is_noop_on_linux(monkeypatch):
+    from qyro.client.macos_dock_icon import set_macos_dock_icon
+
+    monkeypatch.setattr(sys, "platform", "linux")
+    assert not set_macos_dock_icon("/tmp/icon.png")
+
+
+def test_macos_dock_icon_missing_file_warns(monkeypatch):
+    from qyro.client.macos_dock_icon import set_macos_dock_icon
+
+    monkeypatch.setattr(sys, "platform", "darwin")
+    with pytest.warns(RuntimeWarning, match="does not exist"):
+        assert not set_macos_dock_icon("/nonexistent/velto.png")
