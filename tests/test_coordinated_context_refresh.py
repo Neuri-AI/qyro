@@ -9,7 +9,7 @@ from qyro.domain.entities import AppMetadata
 
 class Demo(VeltoContext):
     def render(self):
-        from psx import Box, Text, use_state
+        from psx import Text, use_state\nfrom psx.core.vnode import Box
         count, _ = use_state(23)
         return Box(Text(f"before:{count}"))
 
@@ -21,7 +21,7 @@ def test_context_applies_authored_source_change_without_recreating_native_host(
 
     source = tmp_path / "main.py"
     source.write_text(
-        "from psx import Box, Text, use_state\n"
+        "from psx import Text, use_state\nfrom psx.core.vnode import Box\n"
         "class Demo:\n"
         "    def render(self):\n"
         "        count, _ = use_state(23)\n"
@@ -65,7 +65,7 @@ def test_context_remounts_hook_incompatible_root_and_keeps_native_host(
 
     source = tmp_path / "main.py"
     source.write_text(
-        "from psx import Box, Text, use_state, use_ref\n"
+        "from psx import Text, use_state, use_ref\nfrom psx.core.vnode import Box\n"
         "class Demo:\n"
         "    def render(self):\n"
         "        count, _ = use_state(23)\n"
