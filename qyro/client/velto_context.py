@@ -274,7 +274,9 @@ class VeltoContext:
                 # Set the app icon before PSX mounts or shows the window.
                 icon = self.get_app_icon_path()
                 if icon:
-                    Window.icon = icon
+                    # The provider is already initialized at this point.
+                    # Apply the icon to its live SDL window.
+                    Window.set_icon(icon)
                 # Do not write Window.system_size after importing this
                 # provider: _size changes can recreate the SDL/GL surface
                 # before the event loop and strand an oversize Cocoa window.
@@ -358,7 +360,13 @@ class VeltoContext:
             # resize it again after PSX has mounted its widget tree.
             Window.title = title
             if icon:
-                Window.icon = icon
+                # Assign the Kivy property and call the documented native
+                # Window API on the real SDL2 provider (not an App instance).
+                Window.set_icon(icon)
+                if self.platform is PlatformType.MACOS:
+                    # SDL2 does not reliably change the macOS Dock tile.
+                    from .macos_dock_icon import set_macos_dock_icon
+                    set_macos_dock_icon(icon)
 
     @staticmethod
     def _apply_tk_icon(root: Any, icon: str) -> None:
