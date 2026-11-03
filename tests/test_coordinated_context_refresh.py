@@ -18,8 +18,6 @@ def test_context_applies_authored_source_change_without_recreating_native_host(
     tmp_path, monkeypatch,
 ):
     from psx.renderers.headless import HeadlessRenderer
-    from psx.layout.fallback.engine import PythonLayoutEngine
-    from psx.layout.contracts.model import AvailableSize, IntrinsicSizes, LayoutConstraints
 
     source = tmp_path / "main.py"
     source.write_text(
@@ -39,11 +37,10 @@ def test_context_applies_authored_source_change_without_recreating_native_host(
         "metadata": AppMetadata(app_name="Refresh test", raw_settings={"framework": "pyside6"}),
         "is_frozen": False,
     }
-    renderer = HeadlessRenderer(
-        sfle_constraints=LayoutConstraints(AvailableSize(640, True), AvailableSize(480, True)),
-        engine=PythonLayoutEngine(),
-        measure_intrinsic=lambda node: IntrinsicSizes(4, 20, 8, 12, 18, 12, 8),
-    )
+    # Refresh/remount tests exercise reconciler identity, not layout geometry.
+    # Avoid binding them to the optional Cinnamon Python fallback (or requiring
+    # a compiled Rust extension in the CI image).
+    renderer = HeadlessRenderer()
     monkeypatch.setattr(Demo, "_create_renderer", lambda *_: renderer)
     monkeypatch.setattr(Demo, "_present", lambda *_: None)
     context = None
@@ -66,8 +63,6 @@ def test_context_remounts_hook_incompatible_root_and_keeps_native_host(
     tmp_path, monkeypatch,
 ):
     from psx.renderers.headless import HeadlessRenderer
-    from psx.layout.fallback.engine import PythonLayoutEngine
-    from psx.layout.contracts.model import AvailableSize, IntrinsicSizes, LayoutConstraints
 
     source = tmp_path / "main.py"
     source.write_text(
@@ -88,11 +83,10 @@ def test_context_remounts_hook_incompatible_root_and_keeps_native_host(
         "metadata": AppMetadata(app_name="Remount test", raw_settings={"framework": "pyside6"}),
         "is_frozen": False,
     }
-    renderer = HeadlessRenderer(
-        sfle_constraints=LayoutConstraints(AvailableSize(640, True), AvailableSize(480, True)),
-        engine=PythonLayoutEngine(),
-        measure_intrinsic=lambda node: IntrinsicSizes(4, 20, 8, 12, 18, 12, 8),
-    )
+    # Refresh/remount tests exercise reconciler identity, not layout geometry.
+    # Avoid binding them to the optional Cinnamon Python fallback (or requiring
+    # a compiled Rust extension in the CI image).
+    renderer = HeadlessRenderer()
     monkeypatch.setattr(Demo, "_create_renderer", lambda *_: renderer)
     monkeypatch.setattr(Demo, "_present", lambda *_: None)
     context = None
