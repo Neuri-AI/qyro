@@ -15,14 +15,23 @@ class PlatformDetector:
     @staticmethod
     def get_platform() -> PlatformType:
         """Return the platform type detected from the current operating system."""
-        if sys.platform.startswith("win"):
-            return PlatformType.WINDOWS
-        if sys.platform == "darwin":
-            return PlatformType.MACOS
-        if sys.platform.startswith("linux"):
-            return PlatformType.LINUX
-        if sys.platform.startswith("android"):
+        platform = sys.platform.lower()
+        # Some Android Python distributions still report "linux". Prefer
+        # the interpreter's Android API signal before generic Linux detection.
+        if platform.startswith("android") or callable(
+            getattr(sys, "getandroidapilevel", None)
+        ):
             return PlatformType.ANDROID
+        # CPython iOS ports report "ios"; older embedded runtimes may use
+        # "iphoneos". Do not classify iOS as macOS via Darwin assumptions.
+        if platform in ("ios", "iphoneos") or platform.startswith("ios-"):
+            return PlatformType.IOS
+        if platform.startswith("win"):
+            return PlatformType.WINDOWS
+        if platform == "darwin":
+            return PlatformType.MACOS
+        if platform.startswith("linux"):
+            return PlatformType.LINUX
         return PlatformType.UNKNOWN
 
     @classmethod
