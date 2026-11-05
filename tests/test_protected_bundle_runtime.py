@@ -81,7 +81,12 @@ def _write_protected_package(
         text=True,
     )
     if proc.returncode != 0:
-        raise RuntimeError("cythonize failed in test fixture")
+        raise RuntimeError(
+            "cythonize failed in test fixture "
+            f"(exit {proc.returncode}; Python: {sys.executable}; "
+            f"working directory: {velto_dir}).\n"
+            f"Compiler output:\n{proc.stdout}"
+        )
 
     runtime_candidates = list(velto_dir.glob("runtime*.so")) + list(velto_dir.glob("runtime*.pyd"))
     if not runtime_candidates:
