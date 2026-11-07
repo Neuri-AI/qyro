@@ -12,7 +12,6 @@ from qyro.adapters.resources.runtime_secret import (
     find_runtime_secret_module,
     read_runtime_secret,
 )
-from qyro.adapters.resources.secrets_crypto import decrypt_secrets_payload
 from qyro.application.ports.settings import ISettingsPort
 from qyro.adapters.resources.protected_bundle import ProtectedResourceBundle
 from qyro.domain.entities import AppMetadata, PlatformType
@@ -150,6 +149,7 @@ class JsonSettingsAdapter(ISettingsPort):
             if runtime_module_path is None:
                 raise ValueError("Encrypted secrets were found but the runtime secret module is missing")
             runtime_secret = read_runtime_secret(runtime_module_path)
+            from qyro.adapters.resources.secrets_crypto import decrypt_secrets_payload
             plaintext = decrypt_secrets_payload(embedded_payload, runtime_secret)
             self._merge_decrypted_secrets_payload(plaintext, combined)
             return
@@ -163,6 +163,7 @@ class JsonSettingsAdapter(ISettingsPort):
             raise ValueError("Encrypted secrets were found but the runtime secret module is missing")
 
         runtime_secret = read_runtime_secret(runtime_module_path)
+        from qyro.adapters.resources.secrets_crypto import decrypt_secrets_payload
         plaintext = decrypt_secrets_payload(encrypted_path.read_bytes(), runtime_secret)
 
         self._merge_decrypted_secrets_payload(plaintext, combined)

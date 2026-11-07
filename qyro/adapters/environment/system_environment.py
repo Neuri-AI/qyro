@@ -33,6 +33,24 @@ class SystemEnvironmentAdapter(IEnvironmentPort):
         if self._custom_root:
             return self._custom_root
 
+        # python-for-android extracts application files under .../files/app,
+        # whereas sys.executable points to the embedded Python binary and
+        # unrelated ancestors may contain a "src" folder. The real
+        # application root is the directory containing settings/base.json,
+        # not necessarily the executable's directory or a pyproject.toml.
+        if self.get_platform() is PlatformType.ANDROID:
+            main_module = sys.modules.get("__main__")
+            main_file = getattr(main_module, "__file__", None)
+            candidates = [Path.cwd()]
+            if isinstance(main_file, (str, Path)) and main_file:
+                candidates.insert(0, Path(main_file).resolve().parent)
+            for candidate in candidates:
+                if (candidate / "settings" / "base.json").is_file():
+                    return candidate
+            # Preserve the p4a working directory as the fallback; never
+            # scan upward into the Android OS for arbitrary "src" folders.
+            return Path.cwd()
+
         if self.is_frozen():
             # Executable directory
             return Path(sys.executable).resolve().parent
