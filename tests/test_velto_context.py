@@ -237,6 +237,26 @@ def test_qt_presentation_uses_the_host_window() -> None:
     assert window.shown is True
 
 
+def test_qt_mobile_presentation_does_not_resize_activity_surface() -> None:
+    class _Window:
+        def __init__(self) -> None:
+            self.resized = False
+        def resize(self, *_args) -> None:
+            self.resized = True
+        def setWindowTitle(self, _title) -> None:
+            pass
+        def show(self) -> None:
+            pass
+    window = _Window()
+    bind_context({"framework": "PySide6"})
+    VeltoContext._global_boot_info["platform"] = PlatformType.ANDROID
+    context = _Example()
+    context._handle = types.SimpleNamespace(widget=types.SimpleNamespace(window=lambda: window))
+    context._renderer = types.SimpleNamespace(application=object())
+    context._present("pyside6", 800, 600)
+    assert window.resized is False
+
+
 def test_context_exposes_runtime_and_resource_helpers(tmp_path: Path) -> None:
     icon = tmp_path / "icon.png"
     icon.write_text("fake", encoding="utf-8")

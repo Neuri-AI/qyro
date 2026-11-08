@@ -4,6 +4,8 @@ Clean Architecture runtime engine and lifecycle framework for Python desktop GUI
 Decoupled from CLI tools, independent and multi-toolkit ready.
 """
 
+from importlib.metadata import PackageNotFoundError, version as distribution_version
+
 from qyro.client.velto_context import VeltoContext
 from qyro.container import EngineContainer
 from qyro.adapters.platform.detector import PlatformDetector
@@ -15,7 +17,10 @@ from qyro.domain.errors import (
     FrameworkNotAvailableError,
 )
 
-__version__ = "0.1.0"
+try:
+    __version__ = distribution_version("qyro-engine")
+except PackageNotFoundError:
+    __version__ = "0+unknown"
 
 # Module-level singleton container for quick procedural usage
 _default_container: EngineContainer | None = None
