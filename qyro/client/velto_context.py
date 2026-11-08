@@ -258,16 +258,20 @@ class VeltoContext:
         try:
             if binding == "pyside6":
                 from psx.renderers.qt.pyside import PySide6Renderer
-                return PySide6Renderer(argv=self._argv, sfle_constraints=constraints)
+                renderer = PySide6Renderer(argv=self._argv, sfle_constraints=constraints)
+                return self._mobile_qt_viewport(renderer, constraints)
             if binding == "pyside2":
                 from psx.renderers.qt.pyside import PySide2Renderer
-                return PySide2Renderer(argv=self._argv, sfle_constraints=constraints)
+                renderer = PySide2Renderer(argv=self._argv, sfle_constraints=constraints)
+                return self._mobile_qt_viewport(renderer, constraints)
             if binding == "pyqt6":
                 from psx.renderers.qt.pyqt import PyQt6Renderer
-                return PyQt6Renderer(argv=self._argv, sfle_constraints=constraints)
+                renderer = PyQt6Renderer(argv=self._argv, sfle_constraints=constraints)
+                return self._mobile_qt_viewport(renderer, constraints)
             if binding == "pyqt5":
                 from psx.renderers.qt.pyqt import PyQt5Renderer
-                return PyQt5Renderer(argv=self._argv, sfle_constraints=constraints)
+                renderer = PyQt5Renderer(argv=self._argv, sfle_constraints=constraints)
+                return self._mobile_qt_viewport(renderer, constraints)
             if binding == "kivy":
                 from kivy.core.window import Window
                 # SDL's window provider can be created on first import.
@@ -298,6 +302,27 @@ class VeltoContext:
                 binding, f"Install the matching Velto extra: velto[{binding}]."
             ) from exc
         raise AssertionError("validated Velto binding did not select a renderer")
+
+    def _mobile_qt_viewport(self, renderer: Any, fallback: Any) -> Any:
+        """Seed Cinnamon from the real mobile surface, never desktop config.
+
+        Qt creates QApplication before PSX mounts. On Android/iOS its primary
+        screen is therefore available here, while ``base.json.window`` is
+        merely a desktop default. The renderer continues to track subsequent
+        native resize/orientation events itself.
+        """
+        if not self.platform.is_mobile:
+            return renderer
+        screen = getattr(getattr(renderer, "application", None), "primaryScreen", lambda: None)()
+        geometry = screen.availableGeometry() if screen is not None else None
+        width = geometry.width() if geometry is not None else 0
+        height = geometry.height() if geometry is not None else 0
+        if width > 0 and height > 0:
+            from psx.layout.contracts.model import AvailableSize, LayoutConstraints
+            renderer.set_sfle_constraints(LayoutConstraints(
+                AvailableSize(width, definite=True), AvailableSize(height, definite=True),
+            ))
+        return renderer
 
     def mount(self) -> Any:
         """Create the Velto app, mount the PSX root, and present its window."""
@@ -339,7 +364,11 @@ class VeltoContext:
         if binding in {"pyside6", "pyside2", "pyqt6", "pyqt5"}:
             root_widget = self._handle.widget
             window = root_widget.window() if callable(getattr(root_widget, "window", None)) else root_widget
-            window.resize(width, height)
+            # Mobile activities own their surface dimensions. Resizing to
+            # base.json's desktop default causes a first-frame 800x600
+            # Cinnamon layout followed by a visible Android relayout.
+            if not self.platform.is_mobile:
+                window.resize(width, height)
             window.setWindowTitle(title)
             if icon:
                 package = type(self._renderer.application).__module__.split(".")[0]
